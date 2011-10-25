@@ -45,12 +45,20 @@ process.ecalTimePhyTree.barrelSuperClusterCollection = cms.InputTag("correctedHy
 #  if you want cleaned EB SC use this: process.ecalTimePhyTree.barrelSuperClusterCollection = cms.InputTag("hybridSuperClusters","uncleanOnlyHybridSuperClusters")
 process.ecalTimePhyTree.endcapSuperClusterCollection = cms.InputTag("correctedMulti5x5SuperClustersWithPreshower","")
 process.ecalTimePhyTree.muonCollection = cms.InputTag("muons")
-process.ecalTimePhyTree.runNum = 999999
+process.ecalTimePhyTree.runNum = 0
+# Set up cuts for physics objects
+# jet cuts                                           pt  eta  
+process.ecalTimePhyTree.jetCuts       = cms.vdouble( 25. , 2.4 )
+process.ecalTimePhyTree.metCuts       = cms.vdouble( 20  )
+# photon cuts                                        pt  eta  dR
+process.ecalTimePhyTree.photonCuts    = cms.vdouble( 30, 2.4, 0.3 )
+process.ecalTimePhyTree.electronCuts  = cms.vdouble( 25, 2.4, 0.15, 0.3 )
+process.ecalTimePhyTree.muonCuts      = cms.vdouble( 25, 2.1, 0.2, 0.3 )
 
 
 process.dumpEvContent = cms.EDAnalyzer("EventContentAnalyzer")
 
-process.maxEvents = cms.untracked.PSet(input = cms.untracked.int32(1000))
+process.maxEvents = cms.untracked.PSet(input = cms.untracked.int32(-1))
 
 process.p = cms.Path(
     # process.dumpEvContent  *

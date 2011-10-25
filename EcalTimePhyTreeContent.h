@@ -16,7 +16,7 @@
 #define MAXJET 10
 #define MAXELE 10
 #define MAXPHO 10
-
+#define MAXOBJ 50
 
 struct EcalTimePhyTreeContent
 {
@@ -61,6 +61,7 @@ struct EcalTimePhyTreeContent
   int nSuperClusters;
   int nBarrelSuperClusters;
   int nEndcapSuperClusters;
+  float SCPIdx[MAXSC] ;
   float superClusterRawEnergy[MAXSC];
   float superClusterPhiWidth[MAXSC];
   float superClusterEtaWidth[MAXSC];
@@ -78,6 +79,8 @@ struct EcalTimePhyTreeContent
     
   // basic cluster variables	
   int nClusters;
+  int   clusterMom[MAXC];
+  float CPIdx[MAXC] ;
   float clusterEnergy[MAXC];
   float clusterTransverseEnergy[MAXC];
   float clusterE1[MAXC];

@@ -235,6 +235,11 @@ void EcalTimePhyTreeMaker::analyze (const edm::Event& iEvent, const edm::EventSe
   iEvent.getByLabel(vertexCollection_, recVtxs);
   const reco::VertexCollection * theRecVtxs = recVtxs.product();
 
+  // Initialize Counter for SCluster and Cluster
+  numberOfSuperClusters = 0;
+  numberOfClusters = 0;
+  sclist.clear() ;
+
   dumpPATObjectInfo( iEvent ) ;
 
   dump3Ginfo(iEvent, iSetup, myTreeVariables_) ;
@@ -245,6 +250,11 @@ void EcalTimePhyTreeMaker::analyze (const edm::Event& iEvent, const edm::EventSe
   dumpEndcapClusterInfo(iEvent, theGeometry, theCaloTopology,
 			theEndcapEcalRecHits, 
 			theEndcapBasicClusters, theEndcapSuperClusters, lazyTools, XtalMap, XtalMapCurved, myTreeVariables_) ;
+
+  dumpJetBarrelClusterInfo(iEvent, theGeometry, theCaloTopology, theBarrelEcalRecHits, 
+                           theBarrelBasicClusters, lazyTools, XtalMap, XtalMapCurved ) ;
+  dumpJetEndcapClusterInfo(iEvent, theGeometry, theCaloTopology, theEndcapEcalRecHits, 
+                           theEndcapBasicClusters, lazyTools, XtalMap, XtalMapCurved ) ;
   
   dumpVertexInfo(theRecVtxs, myTreeVariables_);
 
@@ -293,9 +303,7 @@ std::string EcalTimePhyTreeMaker::intToString (int num)
 }
 
 
-
 // -----------------------------------------------------------------------------------------
-
 void EcalTimePhyTreeMaker::dumpPATObjectInfo (const edm::Event& iEvent )
 {
    edm::Handle<std::vector<pat::Muon> > muons;
@@ -307,9 +315,7 @@ void EcalTimePhyTreeMaker::dumpPATObjectInfo (const edm::Event& iEvent )
    edm::Handle<std::vector<pat::Jet> > jets;
    iEvent.getByLabel(patJetSource_, jets);
 
-   //edm::Handle<std::vector<pat::Photon> > photons;
-   //iEvent.getByLabel(patPhotonSource_, photons);
-   edm::Handle<reco::PhotonCollection> photons; 
+   edm::Handle<std::vector<pat::Photon> > photons;
    iEvent.getByLabel(patPhotonSource_, photons);
    
    for (std::vector<pat::MET>::const_iterator it = mets->begin(); it != mets->end(); it++) {
@@ -319,7 +325,7 @@ void EcalTimePhyTreeMaker::dumpPATObjectInfo (const edm::Event& iEvent )
        myTreeVariables_.metPy = it->py() ;
    }
 
-   std::vector<const pat::Jet*> selectedJets ;
+   selectedJets.clear() ;
    for (std::vector<pat::Jet>::const_iterator it = jets->begin(); it != jets->end(); it++) {
        if ( it->pt() < jetCuts_[0] || fabs( it->eta() ) > jetCuts_[1] ) continue ;
        // Jet ID cuts
@@ -332,7 +338,8 @@ void EcalTimePhyTreeMaker::dumpPATObjectInfo (const edm::Event& iEvent )
        selectedJets.push_back( &(*it) ) ;
    }
 
-   std::vector<const pat::Electron*> selectedElectrons ;
+   selectedElectrons.clear() ;
+   float eidx = 11. ;
    for (std::vector<pat::Electron>::const_iterator it = electrons->begin(); it != electrons->end(); it++) {
        if ( it->pt() < electronCuts_[0] || fabs( it->eta() ) > electronCuts_[1] ) continue ;
        double relIso =  ( it->chargedHadronIso()+ it->neutralHadronIso() + it->photonIso () ) / it->pt();
@@ -345,11 +352,13 @@ void EcalTimePhyTreeMaker::dumpPATObjectInfo (const edm::Event& iEvent )
        if ( dR <= electronCuts_[3] ) continue ;
        double nLost = it->gsfTrack()->trackerExpectedHitsInner().numberOfLostHits() ;
        if ( nLost >= 2 ) continue ;
-       
+       eidx += 0.1 ;
+       if ( !it->superCluster().isNull() ) sclist.push_back( make_pair(it->superCluster(), eidx ) );
        selectedElectrons.push_back( &(*it) ) ;
    }
 
-   std::vector<const pat::Muon*> selectedMuons ;
+   selectedMuons.clear() ;
+   float midx = 13.0 ;
    for (std::vector<pat::Muon>::const_iterator it = muons->begin(); it != muons->end(); it++) {
        if ( it->pt() < muonCuts_[0] || fabs( it->eta() ) > muonCuts_[1] ) continue ;
        double relIso =  ( it->chargedHadronIso()+ it->neutralHadronIso() + it->photonIso () ) / it->pt();
@@ -360,11 +369,13 @@ void EcalTimePhyTreeMaker::dumpPATObjectInfo (const edm::Event& iEvent )
            if ( dR_ < dR ) dR = dR_ ;
        }
        if ( dR <= muonCuts_[3] ) continue ;
-
+       midx += 0.1 ;
+       if ( !it->superCluster().isNull() ) sclist.push_back( make_pair(it->superCluster(), midx ) );
        selectedMuons.push_back( &(*it) ) ;
    }
-   /*
-   std::vector<const pat::Photon*> selectedPhotons ;
+
+   selectedPhotons.clear() ;
+   float gidx = 22.0 ;
    for (std::vector<pat::Photon>::const_iterator it = photons->begin(); it != photons->end(); it++) {
        if ( it->pt() < photonCuts_[0] || fabs( it->eta() ) > photonCuts_[1] ) continue ;
        double dR = 999 ;
@@ -373,18 +384,8 @@ void EcalTimePhyTreeMaker::dumpPATObjectInfo (const edm::Event& iEvent )
            if ( dR_ < dR ) dR = dR_ ;
        }
        if ( dR <= photonCuts_[2] ) continue ;
-       selectedPhotons.push_back( &(*it) ) ;
-   }
-    */
-   std::vector<const reco::Photon*> selectedPhotons ;
-   for(reco::PhotonCollection::const_iterator it = photons->begin(); it != photons->end(); it++) {
-       if ( it->pt() < photonCuts_[0] || fabs( it->eta() ) > photonCuts_[1] ) continue ;
-       double dR = 999 ;
-       for (size_t j=0; j < selectedJets.size(); j++ ) {
-           double dR_ =  ROOT::Math::VectorUtil::DeltaR( it->p4(), selectedJets[j]->p4() ) ;
-           if ( dR_ < dR ) dR = dR_ ;
-       }
-       if ( dR <= photonCuts_[2] ) continue ;
+       gidx += 0.1 ;
+       if ( !it->superCluster().isNull() ) sclist.push_back( make_pair(it->superCluster(), gidx ) );
        selectedPhotons.push_back( &(*it) ) ;
    }
 
@@ -394,8 +395,32 @@ void EcalTimePhyTreeMaker::dumpPATObjectInfo (const edm::Event& iEvent )
        myTreeVariables_.jetPx[k] = selectedJets[k]->p4().Px() ;
        myTreeVariables_.jetPy[k] = selectedJets[k]->p4().Py() ;
        myTreeVariables_.jetPz[k] = selectedJets[k]->p4().Pz() ;
-       myTreeVariables_.jetE[k] = selectedJets[k]->p4().E() ;
+       myTreeVariables_.jetE[k]  = selectedJets[k]->p4().E()  ;
+       
+       /*
+       const std::vector< reco::PFCandidatePtr > pfCands = selectedJets[k]->getPFConstituents() ;
+       cout<<" pfcand size = "<< pfCands.size() << endl;
+       for (size_t j=0; j< pfCands.size(); j++ ) {
+           const reco::PFCandidate::ElementsInBlocks pfElements = pfCands[j]->elementsInBlocks() ;
+           cout<<" Cand"<<j<<" have : "<<endl;
+           for ( size_t i=0; i< pfElements.size(); i++) {
+               reco::PFBlockRef blockRef = pfElements[i].first ;
+               unsigned idx        = pfElements[i].second ;
+               const edm::OwnVector< reco::PFBlockElement > &elements = blockRef.get()->elements() ;
+               cout<<"     element idx = "<< idx  << endl ;
+               //const reco::PFBlockElementCluster * pfClust =  
+               //      dynamic_cast<const reco::PFBlockElementCluster*>( *(&elements[idx]) ); 
+               //float eneclust  = pfClust->clusterRef()->energy();
+           }
+           //reco::SuperClusterRef scRefs = pfCands[j]->superClusterRef() ;
+           //if ( !scRefs.isNull() ) cout<<" raw E from Jet "<< scRefs.get()->rawEnergy() << endl;
+           
+       }*/
+       
    }
+   //cout<<" sc collection = "<< sclist.size() ; 
+   //cout<<" N_e: "<< selectedElectrons.size() <<" N g: "<< selectedPhotons.size() ;
+   //cout<<" N_m: "<< selectedMuons.size() <<" N_J:" << selectedJets.size() << endl;
    myTreeVariables_.nJets = static_cast<int> ( selectedJets.size() ) ;
 
    for ( size_t k=0; k< selectedMuons.size(); k++ ) {
@@ -409,19 +434,19 @@ void EcalTimePhyTreeMaker::dumpPATObjectInfo (const edm::Event& iEvent )
 
    for ( size_t k=0; k< selectedElectrons.size(); k++ ) {
        if ( k >= 10 ) break ;
-       myTreeVariables_.muPx[k] = selectedElectrons[k]->p4().Px() ;
-       myTreeVariables_.muPy[k] = selectedElectrons[k]->p4().Py() ;
-       myTreeVariables_.muPz[k] = selectedElectrons[k]->p4().Pz() ;
-       myTreeVariables_.muE[k] = selectedElectrons[k]->p4().E() ;
+       myTreeVariables_.elePx[k] = selectedElectrons[k]->p4().Px() ;
+       myTreeVariables_.elePy[k] = selectedElectrons[k]->p4().Py() ;
+       myTreeVariables_.elePz[k] = selectedElectrons[k]->p4().Pz() ;
+       myTreeVariables_.eleE[k] = selectedElectrons[k]->p4().E() ;
    }
    myTreeVariables_.nElectrons = static_cast<int> ( selectedElectrons.size() ) ;
 
    for ( size_t k=0; k< selectedPhotons.size(); k++ ) {
        if ( k >= 10 ) break ;
-       myTreeVariables_.muPx[k] = selectedPhotons[k]->p4().Px() ;
-       myTreeVariables_.muPy[k] = selectedPhotons[k]->p4().Py() ;
-       myTreeVariables_.muPz[k] = selectedPhotons[k]->p4().Pz() ;
-       myTreeVariables_.muE[k] = selectedPhotons[k]->p4().E() ;
+       myTreeVariables_.phoPx[k] = selectedPhotons[k]->p4().Px() ;
+       myTreeVariables_.phoPy[k] = selectedPhotons[k]->p4().Py() ;
+       myTreeVariables_.phoPz[k] = selectedPhotons[k]->p4().Pz() ;
+       myTreeVariables_.phoE[k] = selectedPhotons[k]->p4().E() ;
    }
    myTreeVariables_.nPhotons = static_cast<int> ( selectedPhotons.size() ) ;
 
@@ -440,176 +465,186 @@ void EcalTimePhyTreeMaker::dumpBarrelClusterInfo (const edm::Event& iEvent,
 {            
   // get number of of objects already present in the tree (none if dumpBarrelClusterInfo is called first)
   // this will be the index looping over the SC collection;
-  int numberOfSuperClusters = myTreeVariables_.nSuperClusters;
+  //numberOfSuperClusters = myTreeVariables_.nSuperClusters;
   // this will be the index looping over the BC collection;
-  int numberOfClusters      = myTreeVariables_.nClusters;
+  //numberOfClusters      = myTreeVariables_.nClusters;
 
   const EcalIntercalibConstantMap& icalMap = ical->getMap();
   float adcToGeV = float(agc->getEBValue());
   
   //number of superClusters in event (collection = vector!)
-  myTreeVariables_.nSuperClusters += theBarrelSuperClusters->size () ;
   myTreeVariables_.nBarrelSuperClusters = theBarrelSuperClusters->size () ;
   
   /////////////////////////////////////////////////////////////////////////////////////////
   //loop on all superclusters in event
   for (reco::SuperClusterCollection::const_iterator sclus = theBarrelSuperClusters->begin () ; 
-       sclus != theBarrelSuperClusters->end ()  && numberOfSuperClusters<MAXSC;
-       ++sclus) 
-    {//start Loop on SC's
-  
-      //    int numberOfXtalsInSuperCluster = 0 ;//counter for all xtals in supercluster 
-      
-      myTreeVariables_.nClustersInSuperCluster[numberOfSuperClusters] = sclus -> clustersSize () ;
-      //myTreeVariables_.superClusterType[numberOfSuperClusters] = 0 ;
-      
-      myTreeVariables_.superClusterEta[numberOfSuperClusters] = sclus -> position ().eta () ;
-      myTreeVariables_.superClusterPhi[numberOfSuperClusters] = sclus -> position ().phi () ;
-      myTreeVariables_.superClusterX[numberOfSuperClusters] = sclus -> position ().x () ;
-      myTreeVariables_.superClusterY[numberOfSuperClusters] = sclus -> position ().y () ;
-      myTreeVariables_.superClusterZ[numberOfSuperClusters] = sclus -> position ().z () ;
-      myTreeVariables_.superClusterRawEnergy[numberOfSuperClusters] = sclus -> rawEnergy () ;
-      myTreeVariables_.superClusterPhiWidth[numberOfSuperClusters] = sclus -> phiWidth () ;
-      myTreeVariables_.superClusterEtaWidth[numberOfSuperClusters] = sclus -> etaWidth () ;
+       sclus != theBarrelSuperClusters->end () ;  ++sclus)  {//start Loop on SC's
 
-      numberOfSuperClusters++ ;
+       // matching SC from e, photon, mu
+       bool getSC = false ;
+       float objMatchId = -1 ;
+       for ( size_t i=0; i< sclist.size(); i++) {
+           if ( sclist[i].first.isNull() )     continue; 
+           if ( sclist[i].first.get()->eta() == sclus->eta() && sclist[i].first.get()->phi() == sclus->phi() ) {
+              //cout<<" E = "<< sclist[i].first.get()->energy() <<" from "<< sclist[i].second <<endl ; 
+              getSC = true ;
+              objMatchId = sclist[i].second ;
+              break ;
+           }
+       }
+       if ( !getSC ) continue ;
+
+       //    int numberOfXtalsInSuperCluster = 0 ;//counter for all xtals in supercluster 
+       myTreeVariables_.SCPIdx[numberOfSuperClusters] = objMatchId ;
+       //cout<<" EB SC "<<numberOfSuperClusters<<"  objId: "<<objMatchId <<" ->"<< myTreeVariables_.SCPIdx[numberOfSuperClusters]<<endl;
+       myTreeVariables_.nClustersInSuperCluster[numberOfSuperClusters] = sclus -> clustersSize () ;
+       //myTreeVariables_.superClusterType[numberOfSuperClusters] = 0 ;
       
-    } //end supercluster loop
+       myTreeVariables_.superClusterEta[numberOfSuperClusters] = sclus -> position ().eta () ;
+       myTreeVariables_.superClusterPhi[numberOfSuperClusters] = sclus -> position ().phi () ;
+       myTreeVariables_.superClusterX[numberOfSuperClusters] = sclus -> position ().x () ;
+       myTreeVariables_.superClusterY[numberOfSuperClusters] = sclus -> position ().y () ;
+       myTreeVariables_.superClusterZ[numberOfSuperClusters] = sclus -> position ().z () ;
+       myTreeVariables_.superClusterRawEnergy[numberOfSuperClusters] = sclus -> rawEnergy () ;
+       myTreeVariables_.superClusterPhiWidth[numberOfSuperClusters] = sclus -> phiWidth () ;
+       myTreeVariables_.superClusterEtaWidth[numberOfSuperClusters] = sclus -> etaWidth () ;
+
+      
  // GF - FIXME : at some point we may want to loop only over BC's which are included inside a give SC
  // more natural. But even what we have (i.e. two separate loops) should not generate inconsistencies
- 
 
-   ///////////////////////////////////////////////////////////////////////////////////////
-   // loop on barrel basic clusters (independently of loop on SC)
-   for (reco::BasicClusterCollection::const_iterator clus = theBarrelBasicClusters->begin () ; 
-	clus != theBarrelBasicClusters->end ()  && numberOfClusters<MAXC;  
-	++clus) // loop on barrel Bclusters
-     {        
-       double energy = (clus)->energy () ;
-       double phi    = (clus)->phi () ;
-       double eta    = (clus)->eta () ;
-       if  ( energy/cosh(eta) <minEtEB_ ) continue;
-       double sinTheta         = fabs( sin( 2 *atan( exp(-1*(clus)->eta()) ) ) );
-       double transverseEnergy = (clus)->energy () * sinTheta;
-       double time = -1000.0 ; // gfdoc: work on this to provide a combination of crystals?
-       double ampli = 0. ;
-       double secondMin = 0. ;
-       double secondTime = -1000. ;
-       int numberOfXtalsInCluster=0 ;//counter for all xtals in cluster
-       int numXtalsinCluster = 0 ;   //xtals in cluster above 3sigma noise  
-       EBDetId maxDet ;
-       EBDetId secDet ;
-       
-       // GFdoc clusterDetIds holds crystals that participate to this basic cluster 
-       std::vector<std::pair<DetId, float> > clusterDetIds = (clus)->hitsAndFractions() ; //get these from the cluster
-       
-       //////////////////////////////////////////////////////////////////////////////////////
-       //loop on xtals in cluster
-       for (std::vector<std::pair<DetId, float> >::const_iterator detitr = clusterDetIds.begin () ; 
-	    detitr != clusterDetIds.end ()  && numberOfXtalsInCluster<MAXXTALINC; // && numberOfXtals<MAXXTAL ; 
-	    ++detitr)// loop on rechics of barrel basic clusters
-	 {
+      ///////////////////////////////////////////////////////////////////////////////////////
+      // loop on barrel basic clusters from SC
 
-	   // Here I use the "find" on a digi collection... I have been warned...   (GFdoc: ??)
-	   // GFdoc: check if DetId belongs to ECAL; if so, find it among those if this basic cluster
-	   if ( (detitr -> first).det () != DetId::Ecal) 
-	     { 
-	       std::cout << " det is " << (detitr -> first).det () << " (and not DetId::Ecal)" << std::endl ;
-	       continue ;
-	     }
-	   if ( (detitr -> first).subdetId () != EcalBarrel) 
-	     {
-	       std::cout << " subdet is " << (detitr -> first).subdetId () << " (and not EcalBarrel)" << std::endl ; 
-	       continue ; 
-	     }
+      for ( reco::CaloCluster_iterator  clus =  sclus->clustersBegin()  ;
+            clus != sclus->clustersEnd()  && numberOfClusters<MAXC;   ++clus) // loop on barrel Bclusters
+          {
+
+          double energy = (*clus)->energy () ;
+	  double phi    = (*clus)->phi () ;
+	  double eta    = (*clus)->eta () ;
+	  if  ( energy/cosh(eta) <minEtEB_ ) continue;
+	  double sinTheta         = fabs( sin( 2 *atan( exp(-1*(*clus)->eta()) ) ) );
+	  double transverseEnergy = (*clus)->energy () * sinTheta;
+	  double time = -1000.0 ; // gfdoc: work on this to provide a combination of crystals?
+	  double ampli = 0. ;
+	  double secondMin = 0. ;
+	  double secondTime = -1000. ;
+	  int numberOfXtalsInCluster=0 ;//counter for all xtals in cluster
+	  int numXtalsinCluster = 0 ;   //xtals in cluster above 3sigma noise  
+	  EBDetId maxDet ;
+          EBDetId secDet ;
+       
+          // GFdoc clusterDetIds holds crystals that participate to this basic cluster 
+          std::vector<std::pair<DetId, float> > clusterDetIds = (*clus)->hitsAndFractions() ; //get these from the cluster
+       
+          //////////////////////////////////////////////////////////////////////////////////////
+          //loop on xtals in cluster
+          for (std::vector<std::pair<DetId, float> >::const_iterator detitr = clusterDetIds.begin () ; 
+	      detitr != clusterDetIds.end ()  && numberOfXtalsInCluster<MAXXTALINC; // && numberOfXtals<MAXXTAL ; 
+	      ++detitr)// loop on rechics of barrel basic clusters
+	   {
+
+	      // Here I use the "find" on a digi collection... I have been warned...   (GFdoc: ??)
+   	      // GFdoc: check if DetId belongs to ECAL; if so, find it among those if this basic cluster
+    	     if ( (detitr -> first).det () != DetId::Ecal) 
+	        { 
+   	          std::cout << " det is " << (detitr -> first).det () << " (and not DetId::Ecal)" << std::endl ;
+	          continue ;
+	        }
+	     if ( (detitr -> first).subdetId () != EcalBarrel) 
+	        {
+	          std::cout << " subdet is " << (detitr -> first).subdetId () << " (and not EcalBarrel)" << std::endl ; 
+	          continue ; 
+	        }
 	   
-	   // GFdoc now find it!
-	   EcalRecHitCollection::const_iterator thishit = theBarrelEcalRecHits->find ( (detitr -> first) ) ;
-	   if (thishit == theBarrelEcalRecHits->end ()) 
-	     {
-	       continue ;
-	     }
-	   //The checking above should no longer be needed... 
-	   //as only those in the cluster would already have rechits..
+	     // GFdoc now find it!
+	     EcalRecHitCollection::const_iterator thishit = theBarrelEcalRecHits->find ( (detitr -> first) ) ;
+	     if (thishit == theBarrelEcalRecHits->end ()) 
+	        {
+	          continue ;
+	        }
+	     //The checking above should no longer be needed... 
+	     //as only those in the cluster would already have rechits..
 	   
-	   // GFdoc this is one crystal in the basic cluster
-	   EcalRecHit myhit = (*thishit) ;
+	     // GFdoc this is one crystal in the basic cluster
+	     EcalRecHit myhit = (*thishit) ;
 	   
-           // SIC Feb 14 2011 -- Add check on RecHit flags (takes care of spike cleaning in 42X)
-           uint32_t rhFlag = myhit.recoFlag();
-           if( !(rhFlag == EcalRecHit::kGood || rhFlag == EcalRecHit::kOutOfTime ||
+             // SIC Feb 14 2011 -- Add check on RecHit flags (takes care of spike cleaning in 42X)
+             uint32_t rhFlag = myhit.recoFlag();
+             if( !(rhFlag == EcalRecHit::kGood || rhFlag == EcalRecHit::kOutOfTime ||
                  rhFlag == EcalRecHit::kPoorCalib) )
-             continue;
+                 continue;
 	   
-	   // thisamp is the EB amplitude of the current rechit
-	   double thisamp  = myhit.energy () ;
-	   double thistime = myhit.time ();
-	   double thisChi2 = myhit.chi2 ();
-	   double thisOutOfTimeChi2 = myhit.outOfTimeChi2 ();
+	     // thisamp is the EB amplitude of the current rechit
+	     double thisamp  = myhit.energy () ;
+	     double thistime = myhit.time ();
+	     double thisChi2 = myhit.chi2 ();
+	     double thisOutOfTimeChi2 = myhit.outOfTimeChi2 ();
 
 	   
-	   EcalIntercalibConstantMap::const_iterator icalit = icalMap.find(detitr->first);
-	   EcalIntercalibConstant icalconst = 1;
-	   if( icalit!=icalMap.end() ) {
-	     icalconst = (*icalit);
-	   } else {
-	     edm::LogError("EcalTimePhyTreeMaker") << "No intercalib const found for xtal "
+	     EcalIntercalibConstantMap::const_iterator icalit = icalMap.find(detitr->first);
+	     EcalIntercalibConstant icalconst = 1;
+	     if( icalit!=icalMap.end() ) {
+	       icalconst = (*icalit);
+	     } else {
+	       edm::LogError("EcalTimePhyTreeMaker") << "No intercalib const found for xtal "
 						<< (detitr->first).rawId();
-	   }
+   	     }
 	   
-	   // get laser coefficient
-	   float lasercalib = 1.;
-	   lasercalib = laser->getLaserCorrection( detitr->first, iEvent.time());
-	   // std::cout << "GF EB debug: " << lasercalib << std::endl;
+	     // get laser coefficient
+	     float lasercalib = 1.;
+	     lasercalib = laser->getLaserCorrection( detitr->first, iEvent.time());
+	     // std::cout << "GF EB debug: " << lasercalib << std::endl;
 
-	   // discard rechits with A/sigma < 12
-	   if ( thisamp/(icalconst*lasercalib*adcToGeV) < (1.1*12) ) continue;
+	     // discard rechits with A/sigma < 12
+	     if ( thisamp/(icalconst*lasercalib*adcToGeV) < (1.1*12) ) continue;
 
-	   if (thisamp > 0.027) //cut on energy->number of crystals in cluster above 3sigma noise; gf: desirable?
-	     { 
-	       numXtalsinCluster++ ; 
-	     }
-	   if (thisamp > secondMin) 
+	     if (thisamp > 0.027) //cut on energy->number of crystals in cluster above 3sigma noise; gf: desirable?
+             {  
+	        numXtalsinCluster++ ; 
+             }
+	     if (thisamp > secondMin) 
+             {
+	        secondMin = thisamp ; 
+		secondTime = myhit.time () ; 
+		secDet = (EBDetId) (detitr -> first) ;
+             }	
+	     if (secondMin > ampli) 
 	     {
-	       secondMin = thisamp ; 
-	       secondTime = myhit.time () ; 
-	       secDet = (EBDetId) (detitr -> first) ;
-	     }
-	   if (secondMin > ampli) 
-	     {
-	       std::swap (ampli, secondMin) ; 
-	       std::swap (time, secondTime) ; 
-	       std::swap (maxDet, secDet) ;
+	        std::swap (ampli, secondMin) ; 
+	        std::swap (time, secondTime) ; 
+	        std::swap (maxDet, secDet) ;
 	     }
 
 	   
-	   if(myhit.isTimeErrorValid())
-             myTreeVariables_.xtalInBCTimeErr[numberOfClusters][numberOfXtalsInCluster]= myhit.timeError();
-           else
-             myTreeVariables_.xtalInBCTimeErr[numberOfClusters][numberOfXtalsInCluster]= -999999;
+	    if(myhit.isTimeErrorValid())
+              myTreeVariables_.xtalInBCTimeErr[numberOfClusters][numberOfXtalsInCluster]= myhit.timeError();
+            else
+              myTreeVariables_.xtalInBCTimeErr[numberOfClusters][numberOfXtalsInCluster]= -999999;
 
-	   // xtal variables inside a barrel basic cluster 
-	   myTreeVariables_.xtalInBCEnergy[numberOfClusters][numberOfXtalsInCluster]=       (float) thisamp;
-	   myTreeVariables_.xtalInBCTime[numberOfClusters][numberOfXtalsInCluster]=         (float) thistime; 
-	   myTreeVariables_.xtalInBCHashedIndex[numberOfClusters][numberOfXtalsInCluster]=  EBDetId (detitr -> first).hashedIndex () ; 
-	   myTreeVariables_.xtalInBCIEta[numberOfClusters][numberOfXtalsInCluster]=         EBDetId((detitr -> first)).ieta();
-	   myTreeVariables_.xtalInBCIPhi[numberOfClusters][numberOfXtalsInCluster]=         EBDetId((detitr -> first)).iphi();
-           myTreeVariables_.xtalInBCIx[numberOfClusters][numberOfXtalsInCluster]=           -999999; 
-           myTreeVariables_.xtalInBCIy[numberOfClusters][numberOfXtalsInCluster]=           -999999; 
-           myTreeVariables_.xtalInBCFlag[numberOfClusters][numberOfXtalsInCluster]=         myhit.recoFlag(); 
-           myTreeVariables_.xtalInBCAmplitudeADC[numberOfClusters][numberOfXtalsInCluster]= (float) thisamp/(icalconst*lasercalib*adcToGeV);
-           myTreeVariables_.xtalInBCChi2[numberOfClusters][numberOfXtalsInCluster]=         thisChi2;
-           myTreeVariables_.xtalInBCOutOfTimeChi2[numberOfClusters][numberOfXtalsInCluster]=thisOutOfTimeChi2;
-           // note: SwissCross = 1 - E4/E1   
-           myTreeVariables_.xtalInBCSwissCross[numberOfClusters][numberOfXtalsInCluster] =
+	    // xtal variables inside a barrel basic cluster 
+	    myTreeVariables_.xtalInBCEnergy[numberOfClusters][numberOfXtalsInCluster]=       (float) thisamp;
+	    myTreeVariables_.xtalInBCTime[numberOfClusters][numberOfXtalsInCluster]=         (float) thistime; 
+	    myTreeVariables_.xtalInBCHashedIndex[numberOfClusters][numberOfXtalsInCluster]=  EBDetId (detitr -> first).hashedIndex () ; 
+	    myTreeVariables_.xtalInBCIEta[numberOfClusters][numberOfXtalsInCluster]=         EBDetId((detitr -> first)).ieta();
+	    myTreeVariables_.xtalInBCIPhi[numberOfClusters][numberOfXtalsInCluster]=         EBDetId((detitr -> first)).iphi();
+	    myTreeVariables_.xtalInBCIx[numberOfClusters][numberOfXtalsInCluster]=           -999999; 
+	    myTreeVariables_.xtalInBCIy[numberOfClusters][numberOfXtalsInCluster]=           -999999; 
+	    myTreeVariables_.xtalInBCFlag[numberOfClusters][numberOfXtalsInCluster]=         myhit.recoFlag(); 
+	    myTreeVariables_.xtalInBCAmplitudeADC[numberOfClusters][numberOfXtalsInCluster]= (float) thisamp/(icalconst*lasercalib*adcToGeV);
+	    myTreeVariables_.xtalInBCChi2[numberOfClusters][numberOfXtalsInCluster]=         thisChi2;
+	    myTreeVariables_.xtalInBCOutOfTimeChi2[numberOfClusters][numberOfXtalsInCluster]=thisOutOfTimeChi2;
+	    // note: SwissCross = 1 - E4/E1   
+            myTreeVariables_.xtalInBCSwissCross[numberOfClusters][numberOfXtalsInCluster] =
              EcalTools::swissCross(detitr->first,*theBarrelEcalRecHits,0.5);
 
   
-	   GlobalPoint pos = theGeometry->getPosition((myhit).detid());
-	   myTreeVariables_.xtalInBCEta[numberOfClusters][numberOfXtalsInCluster]=      pos.eta();
-	   myTreeVariables_.xtalInBCPhi[numberOfClusters][numberOfXtalsInCluster]=      pos.phi();
+	    GlobalPoint pos = theGeometry->getPosition((myhit).detid());
+	    myTreeVariables_.xtalInBCEta[numberOfClusters][numberOfXtalsInCluster]=      pos.eta();
+	    myTreeVariables_.xtalInBCPhi[numberOfClusters][numberOfXtalsInCluster]=      pos.phi();
 	   
-	   numberOfXtalsInCluster++ ; // increment number of crystals in basic cluster
+	    numberOfXtalsInCluster++ ; // increment number of crystals in basic cluster
 	   
 	 } //end loop on rechits within barrel basic clusters
        //////////////////////////////////////////////////////
@@ -617,6 +652,8 @@ void EcalTimePhyTreeMaker::dumpBarrelClusterInfo (const edm::Event& iEvent,
        float E2 = (float)ampli + (float)secondMin ;
        
        //Set some more values for this cluster
+       myTreeVariables_.clusterMom[numberOfClusters] = numberOfSuperClusters;
+       myTreeVariables_.CPIdx[numberOfClusters]      = objMatchId;
        myTreeVariables_.clusterEnergy[numberOfClusters] = (float) energy ;
        myTreeVariables_.clusterTransverseEnergy[numberOfClusters] = (float) transverseEnergy ;
        myTreeVariables_.clusterTime[numberOfClusters] = (float) time ;
@@ -633,38 +670,39 @@ void EcalTimePhyTreeMaker::dumpBarrelClusterInfo (const edm::Event& iEvent,
 
        // (basic) cluster shapes for barrel
        if(FILL_SHAPE_VARS) {
-	 myTreeVariables_.clusterE2x2[numberOfClusters] = lazyTools -> e2x2(*(clus));
-	 myTreeVariables_.clusterE3x2[numberOfClusters] = lazyTools -> e3x2(*(clus));
-	 myTreeVariables_.clusterE3x3[numberOfClusters] = lazyTools -> e3x3(*(clus));
-	 myTreeVariables_.clusterE4x4[numberOfClusters] = lazyTools -> e4x4(*(clus));
-	 myTreeVariables_.clusterE5x5[numberOfClusters] = lazyTools -> e5x5(*(clus));
+	 myTreeVariables_.clusterE2x2[numberOfClusters] = lazyTools -> e2x2(*(*clus));
+	 myTreeVariables_.clusterE3x2[numberOfClusters] = lazyTools -> e3x2(*(*clus));
+	 myTreeVariables_.clusterE3x3[numberOfClusters] = lazyTools -> e3x3(*(*clus));
+	 myTreeVariables_.clusterE4x4[numberOfClusters] = lazyTools -> e4x4(*(*clus));
+	 myTreeVariables_.clusterE5x5[numberOfClusters] = lazyTools -> e5x5(*(*clus));
 	 
-	 myTreeVariables_.clusterE2x5Right[numberOfClusters]  = lazyTools -> e2x5Right(*(clus));
-	 myTreeVariables_.clusterE2x5Left[numberOfClusters]   = lazyTools -> e2x5Left(*(clus));
-	 myTreeVariables_.clusterE2x5Top[numberOfClusters]    = lazyTools -> e2x5Top(*(clus));
-	 myTreeVariables_.clusterE2x5Bottom[numberOfClusters] = lazyTools -> e2x5Bottom(*(clus));
+	 myTreeVariables_.clusterE2x5Right[numberOfClusters]  = lazyTools -> e2x5Right(*(*clus));
+	 myTreeVariables_.clusterE2x5Left[numberOfClusters]   = lazyTools -> e2x5Left(*(*clus));
+	 myTreeVariables_.clusterE2x5Top[numberOfClusters]    = lazyTools -> e2x5Top(*(*clus));
+	 myTreeVariables_.clusterE2x5Bottom[numberOfClusters] = lazyTools -> e2x5Bottom(*(*clus));
 	 
-	 myTreeVariables_.clusterCovEtaEta[numberOfClusters] = (lazyTools -> covariances(*(clus)))[0];
-	 myTreeVariables_.clusterCovPhiPhi[numberOfClusters] = (lazyTools -> covariances(*(clus)))[2];
-	 myTreeVariables_.clusterCovEtaPhi[numberOfClusters] = (lazyTools -> covariances(*(clus)))[1];
+	 myTreeVariables_.clusterCovEtaEta[numberOfClusters] = (lazyTools -> covariances(*(*clus)))[0];
+	 myTreeVariables_.clusterCovPhiPhi[numberOfClusters] = (lazyTools -> covariances(*(*clus)))[2];
+	 myTreeVariables_.clusterCovEtaPhi[numberOfClusters] = (lazyTools -> covariances(*(*clus)))[1];
 	 
-	 myTreeVariables_.clusterLat[numberOfClusters] = (lazyTools -> lat(*(clus)))[2];
-	 myTreeVariables_.clusterEtaLat[numberOfClusters] = (lazyTools -> lat(*(clus)))[0];
-	 myTreeVariables_.clusterPhiLat[numberOfClusters] = (lazyTools -> lat(*(clus)))[1];
+	 myTreeVariables_.clusterLat[numberOfClusters] = (lazyTools -> lat(*(*clus)))[2];
+	 myTreeVariables_.clusterEtaLat[numberOfClusters] = (lazyTools -> lat(*(*clus)))[0];
+	 myTreeVariables_.clusterPhiLat[numberOfClusters] = (lazyTools -> lat(*(*clus)))[1];
 	 
-	 myTreeVariables_.clusterZernike20[numberOfClusters] = lazyTools -> zernike20(*(clus));
-	 myTreeVariables_.clusterZernike42[numberOfClusters] = lazyTools -> zernike42(*(clus));
+	 myTreeVariables_.clusterZernike20[numberOfClusters] = lazyTools -> zernike20(*(*clus));
+	 myTreeVariables_.clusterZernike42[numberOfClusters] = lazyTools -> zernike42(*(*clus));
        }
        
        numberOfClusters++ ;
-       
      } //end (BASIC)cluster loop
+     numberOfSuperClusters++ ;
+    } //end supercluster loop
    
    
    //number of Bclusters already stored in the ntuple
+   myTreeVariables_.nSuperClusters = numberOfSuperClusters;
    myTreeVariables_.nClusters = numberOfClusters;
    //myTreeVariables_.nXtals    = numberOfXtals ; - obsolete
-
    return ;
 } // end dumpBarrelClusterInfo  
 
@@ -683,8 +721,8 @@ void EcalTimePhyTreeMaker::dumpEndcapClusterInfo (const edm::Event& iEvent,
 					     EcalTimePhyTreeContent & myTreeVariables_)
 {
   // counters come from the ntuple are to account for what was added in dumpBarrelClusterInf
-  int numberOfSuperClusters = myTreeVariables_.nSuperClusters;
-  int numberOfClusters      = myTreeVariables_.nClusters;
+  //numberOfSuperClusters = myTreeVariables_.nSuperClusters;
+  //numberOfClusters      = myTreeVariables_.nClusters;
   // int numberOfXtals         = myTreeVariables_.nXtals ; // this is number of crystals associated to any cluster
 
   const EcalIntercalibConstantMap& icalMap = ical->getMap();
@@ -692,15 +730,30 @@ void EcalTimePhyTreeMaker::dumpEndcapClusterInfo (const edm::Event& iEvent,
   
   
   //number of superClusters in event (collection = vector!)
-  myTreeVariables_.nSuperClusters += theEndcapSuperClusters->size () ;
   myTreeVariables_.nEndcapSuperClusters = theEndcapSuperClusters->size () ;
   
   //loop on all endcap superclusters in event
   for (reco::SuperClusterCollection::const_iterator sclus = theEndcapSuperClusters->begin () ; 
-       sclus != theEndcapSuperClusters->end ()  && numberOfSuperClusters<MAXSC; 
-       ++sclus) 
+       sclus != theEndcapSuperClusters->end () ;  ++sclus) 
     {//loop on SC's
       
+       // matching SC from objects
+       bool getSC = false ;
+       float objMatchId = -1 ;
+       for ( size_t i=0; i< sclist.size(); i++) {
+           if ( sclist[i].first.isNull() ) continue; 
+           if ( sclist[i].first.get()->eta() == sclus->eta() && sclist[i].first.get()->phi() == sclus->phi() ) {
+              //cout<<" E = "<< sclist[i].first.get()->energy() <<" from "<< sclist[i].second <<endl ; 
+              getSC = true ;
+              objMatchId = sclist[i].second ;
+              break ;
+           }
+       }
+
+      if ( !getSC ) continue ;
+
+      myTreeVariables_.SCPIdx[numberOfSuperClusters] = objMatchId ;
+      //cout<<" EE SC "<<numberOfSuperClusters<<"  objId: "<<objMatchId <<" ->"<< myTreeVariables_.SCPIdx[numberOfSuperClusters]<<endl;
       myTreeVariables_.nClustersInSuperCluster[numberOfSuperClusters] = sclus -> clustersSize () ;
      
       myTreeVariables_.superClusterEta[numberOfSuperClusters] = sclus -> position ().eta () ;
@@ -712,26 +765,19 @@ void EcalTimePhyTreeMaker::dumpEndcapClusterInfo (const edm::Event& iEvent,
       myTreeVariables_.superClusterPhiWidth[numberOfSuperClusters] = sclus -> phiWidth () ;
       myTreeVariables_.superClusterEtaWidth[numberOfSuperClusters] = sclus -> etaWidth () ;
 
-      numberOfSuperClusters++ ;
-  
-    } //end endcap supercluster loopsuperClusterEnergySum
   
 
   ///////////////////////////////////////////////////////////////////////////////////////
-  // independent loop on endcap basic clusters
-  // numberOfClusters takes into account for what was added in dumpBarrelClusterInfo
+   for ( reco::CaloCluster_iterator  clus =  sclus->clustersBegin()  ;
+         clus != sclus->clustersEnd()  && numberOfClusters<MAXC;   ++clus) // loop on barrel Bclusters
+       {
 
-  for (reco::BasicClusterCollection::const_iterator clus = theEndcapBasicClusters->begin () ; 
-       clus != theEndcapBasicClusters->end () && numberOfClusters<MAXC;
-       ++clus) // loop on endcap Bclusters
-    {        
-
-         double energy = (clus)->energy () ;
-         double phi    = (clus)->phi () ;
-         double eta    = (clus)->eta () ;
+         double energy = (*clus)->energy () ;
+         double phi    = (*clus)->phi () ;
+         double eta    = (*clus)->eta () ;
 	 if  ( energy/cosh(eta) <minEtEE_ ) continue;
-	 double sinTheta         = fabs( sin( 2 *atan( exp(-1*(clus)->eta()) ) ) );
-	 double transverseEnergy = (clus)->energy () * sinTheta;
+	 double sinTheta         = fabs( sin( 2 *atan( exp(-1*(*clus)->eta()) ) ) );
+	 double transverseEnergy = (*clus)->energy () * sinTheta;
          double time = -1000.0 ;  // gfdoc: work on this to provide a combination of crystals?
          double ampli = 0. ;
          double secondMin = 0. ;
@@ -741,7 +787,7 @@ void EcalTimePhyTreeMaker::dumpEndcapClusterInfo (const edm::Event& iEvent,
          EEDetId maxDet ;
          EEDetId secDet ;
          
-         std::vector<std::pair<DetId, float> > clusterDetIds = (clus)->hitsAndFractions() ; //get these from the cluster
+         std::vector<std::pair<DetId, float> > clusterDetIds = (*clus)->hitsAndFractions() ; //get these from the cluster
 
         //loop on xtals in cluster
          for (std::vector<std::pair<DetId, float> >::const_iterator detitr = clusterDetIds.begin () ; 
@@ -817,8 +863,7 @@ void EcalTimePhyTreeMaker::dumpEndcapClusterInfo (const edm::Event& iEvent,
                  std::swap (maxDet, secDet) ;
                }
 
-
-	     // xtal variables inside an endcap basic cluster 
+	      // xtal variables inside an endcap basic cluster 
 	      myTreeVariables_.xtalInBCEnergy[numberOfClusters][numberOfXtalsInCluster]=      (float) thisamp;
 	      myTreeVariables_.xtalInBCTime[numberOfClusters][numberOfXtalsInCluster]=        (float) thistime;
 	      myTreeVariables_.xtalInBCHashedIndex[numberOfClusters][numberOfXtalsInCluster]= EEDetId (detitr -> first).hashedIndex () ; 
@@ -833,8 +878,11 @@ void EcalTimePhyTreeMaker::dumpEndcapClusterInfo (const edm::Event& iEvent,
               myTreeVariables_.xtalInBCSwissCross[numberOfClusters][numberOfXtalsInCluster] =
                 EcalTools::swissCross(detitr->first,*theEndcapEcalRecHits,0.5);
 
-              
-             numberOfXtalsInCluster++ ; // increment number of crystals in basic cluster
+              GlobalPoint pos = theGeometry->getPosition((myhit).detid());
+              myTreeVariables_.xtalInBCEta[numberOfClusters][numberOfXtalsInCluster]=      pos.eta();
+              myTreeVariables_.xtalInBCPhi[numberOfClusters][numberOfXtalsInCluster]=      pos.phi();
+
+              numberOfXtalsInCluster++ ; // increment number of crystals in basic cluster
 	     
            } //end loop on rechics within endcap basic clusters
          //////////////////////////////////////////////////////
@@ -842,6 +890,8 @@ void EcalTimePhyTreeMaker::dumpEndcapClusterInfo (const edm::Event& iEvent,
          float E2 = (float)ampli + (float)secondMin ;
          
          //Set some more values for this cluster
+         myTreeVariables_.clusterMom[numberOfClusters] = numberOfSuperClusters;
+         myTreeVariables_.CPIdx[numberOfClusters]      = objMatchId;
          myTreeVariables_.clusterEnergy[numberOfClusters] = (float) energy ;
          myTreeVariables_.clusterTransverseEnergy[numberOfClusters] = (float) transverseEnergy ;
          myTreeVariables_.clusterTime[numberOfClusters] = (float) time ;
@@ -856,40 +906,517 @@ void EcalTimePhyTreeMaker::dumpEndcapClusterInfo (const edm::Event& iEvent,
          myTreeVariables_.nXtalsInCluster[numberOfClusters]=numberOfXtalsInCluster ;    
 
 	 // (basic) cluster shapes for endcap
-         myTreeVariables_.clusterE2x2[numberOfClusters] = lazyTools -> e2x2(*(clus));
+         myTreeVariables_.clusterE2x2[numberOfClusters] = lazyTools -> e2x2(*(*clus));
 
-         myTreeVariables_.clusterE3x2[numberOfClusters] = lazyTools -> e3x2(*(clus));
-         myTreeVariables_.clusterE3x3[numberOfClusters] = lazyTools -> e3x3(*(clus));
-         myTreeVariables_.clusterE4x4[numberOfClusters] = lazyTools -> e4x4(*(clus));
-         myTreeVariables_.clusterE5x5[numberOfClusters] = lazyTools -> e5x5(*(clus));
+         myTreeVariables_.clusterE3x2[numberOfClusters] = lazyTools -> e3x2(*(*clus));
+         myTreeVariables_.clusterE3x3[numberOfClusters] = lazyTools -> e3x3(*(*clus));
+         myTreeVariables_.clusterE4x4[numberOfClusters] = lazyTools -> e4x4(*(*clus));
+         myTreeVariables_.clusterE5x5[numberOfClusters] = lazyTools -> e5x5(*(*clus));
 
-         myTreeVariables_.clusterE2x5Right[numberOfClusters] = lazyTools -> e2x5Right(*(clus));
-         myTreeVariables_.clusterE2x5Left[numberOfClusters] = lazyTools -> e2x5Left(*(clus));
-         myTreeVariables_.clusterE2x5Top[numberOfClusters] = lazyTools -> e2x5Top(*(clus));
-         myTreeVariables_.clusterE2x5Bottom[numberOfClusters] = lazyTools -> e2x5Bottom(*(clus));
+         myTreeVariables_.clusterE2x5Right[numberOfClusters] = lazyTools -> e2x5Right(*(*clus));
+         myTreeVariables_.clusterE2x5Left[numberOfClusters] = lazyTools -> e2x5Left(*(*clus));
+         myTreeVariables_.clusterE2x5Top[numberOfClusters] = lazyTools -> e2x5Top(*(*clus));
+         myTreeVariables_.clusterE2x5Bottom[numberOfClusters] = lazyTools -> e2x5Bottom(*(*clus));
 
-         myTreeVariables_.clusterCovEtaEta[numberOfClusters] = (lazyTools -> covariances(*(clus)))[0];
-         myTreeVariables_.clusterCovPhiPhi[numberOfClusters] = (lazyTools -> covariances(*(clus)))[2];
-         myTreeVariables_.clusterCovEtaPhi[numberOfClusters] = (lazyTools -> covariances(*(clus)))[1];
+         myTreeVariables_.clusterCovEtaEta[numberOfClusters] = (lazyTools -> covariances(*(*clus)))[0];
+         myTreeVariables_.clusterCovPhiPhi[numberOfClusters] = (lazyTools -> covariances(*(*clus)))[2];
+         myTreeVariables_.clusterCovEtaPhi[numberOfClusters] = (lazyTools -> covariances(*(*clus)))[1];
 
-         myTreeVariables_.clusterLat[numberOfClusters] = (lazyTools -> lat(*(clus)))[2];
-         myTreeVariables_.clusterEtaLat[numberOfClusters] = (lazyTools -> lat(*(clus)))[0];
-         myTreeVariables_.clusterPhiLat[numberOfClusters] = (lazyTools -> lat(*(clus)))[1];
+         myTreeVariables_.clusterLat[numberOfClusters] = (lazyTools -> lat(*(*clus)))[2];
+         myTreeVariables_.clusterEtaLat[numberOfClusters] = (lazyTools -> lat(*(*clus)))[0];
+         myTreeVariables_.clusterPhiLat[numberOfClusters] = (lazyTools -> lat(*(*clus)))[1];
 
-         myTreeVariables_.clusterZernike20[numberOfClusters] = lazyTools -> zernike20(*(clus));
-         myTreeVariables_.clusterZernike42[numberOfClusters] = lazyTools -> zernike42(*(clus));
+         myTreeVariables_.clusterZernike20[numberOfClusters] = lazyTools -> zernike20(*(*clus));
+         myTreeVariables_.clusterZernike42[numberOfClusters] = lazyTools -> zernike42(*(*clus));
     
          numberOfClusters++ ;
-
     }//end endcap basic cluster loop
+
+    numberOfSuperClusters++ ;
+   } //end endcap supercluster loopsuperClusterEnergySum
      
   //number of B clusters already stored in the ntuple
+  myTreeVariables_.nSuperClusters  = numberOfSuperClusters ;
   myTreeVariables_.nClusters  = numberOfClusters ;
-  //myTreeVariables_.nXtals     = numberOfXtals ;
 
   return ;
 } // end dumpEndcapClusterInfo  
 
+
+void EcalTimePhyTreeMaker::dumpJetBarrelClusterInfo (const edm::Event& iEvent,
+     				             const CaloGeometry * theGeometry,
+					     const CaloTopology * theCaloTopology,
+					     const EcalRecHitCollection* theBarrelEcalRecHits,
+					     const reco::BasicClusterCollection* theBarrelBasicClusters,
+					     EcalClusterLazyTools* lazyTools,
+					     const std::map<int,float> & XtalMap, 
+					     const std::map<int,float> & XtalMapCurved  )
+{            
+  // get number of of objects already present in the tree (none if dumpBarrelClusterInfo is called first)
+  // this will be the index looping over the SC collection;
+  //numberOfSuperClusters = myTreeVariables_.nSuperClusters;
+  //numberOfClusters      = myTreeVariables_.nClusters;
+
+  const EcalIntercalibConstantMap& icalMap = ical->getMap();
+  float adcToGeV = float(agc->getEBValue());
+  
+      ///////////////////////////////////////////////////////////////////////////////////////
+      // loop on barrel basic clusters 
+   bool getC = false;
+   for (reco::BasicClusterCollection::const_iterator clus = theBarrelBasicClusters->begin () ;
+        clus != theBarrelBasicClusters->end ()  && numberOfClusters<MAXC;  ++clus) {   
+
+          double energy = clus->energy () ;
+	  double phi    = clus->phi () ;
+	  double eta    = clus->eta () ;
+	  if  ( energy/cosh(eta) <minEtEB_ ) continue;
+	  double sinTheta         = fabs( sin( 2 *atan( exp(-1*clus->eta()) ) ) );
+	  double transverseEnergy = clus->energy () * sinTheta;
+	  double time = -1000.0 ; // gfdoc: work on this to provide a combination of crystals?
+	  double ampli = 0. ;
+	  double secondMin = 0. ;
+	  double secondTime = -1000. ;
+	  int numberOfXtalsInCluster=0 ;//counter for all xtals in cluster
+	  int numXtalsinCluster = 0 ;   //xtals in cluster above 3sigma noise  
+	  EBDetId maxDet ;
+          EBDetId secDet ;
+       
+          // matching SC from objects
+          float jidx = 100. ;
+          getC = false;
+          for ( size_t i=0; i< selectedJets.size(); i++) {
+               bool matched = matching( clus->energy(), clus->position(), selectedJets[i]->vertex(), selectedJets[i]->p4() ) ;
+               jidx += 0.1 ;
+               if ( matched ) { 
+                  getC = true ;
+                  //cout <<" ** from jet "<< i <<" / "<< selectedJets.size();
+                  break ;
+               }
+          }
+          if ( !getC ) continue ;
+
+          //number of superClusters in event (collection = vector!)
+          myTreeVariables_.SCPIdx[numberOfSuperClusters] = jidx ;
+          //cout<<" BJ Cl "<<numberOfClusters<<"  objId: "<< jidx <<" ->"<< myTreeVariables_.SCPIdx[numberOfSuperClusters]<<endl;
+	  myTreeVariables_.superClusterEta[numberOfSuperClusters] = -99999 ;
+	  myTreeVariables_.superClusterPhi[numberOfSuperClusters] = -99999 ;
+	  myTreeVariables_.superClusterX[numberOfSuperClusters] = -99999 ;
+	  myTreeVariables_.superClusterY[numberOfSuperClusters] = -99999 ;
+	  myTreeVariables_.superClusterZ[numberOfSuperClusters] = -99999 ;
+	  myTreeVariables_.superClusterRawEnergy[numberOfSuperClusters] = -999999 ;
+	  myTreeVariables_.superClusterPhiWidth[numberOfSuperClusters]  = -999999 ;
+	  myTreeVariables_.superClusterEtaWidth[numberOfSuperClusters]  = -999999 ; 
+
+          // GFdoc clusterDetIds holds crystals that participate to this basic cluster 
+          std::vector<std::pair<DetId, float> > clusterDetIds = clus->hitsAndFractions() ; //get these from the cluster
+       
+          //////////////////////////////////////////////////////////////////////////////////////
+          //loop on xtals in cluster
+          for (std::vector<std::pair<DetId, float> >::const_iterator detitr = clusterDetIds.begin () ; 
+	      detitr != clusterDetIds.end ()  && numberOfXtalsInCluster<MAXXTALINC; // && numberOfXtals<MAXXTAL ; 
+	      ++detitr)// loop on rechics of barrel basic clusters
+	   {
+
+	      // Here I use the "find" on a digi collection... I have been warned...   (GFdoc: ??)
+   	      // GFdoc: check if DetId belongs to ECAL; if so, find it among those if this basic cluster
+    	     if ( (detitr -> first).det () != DetId::Ecal) 
+	        { 
+   	          std::cout << " det is " << (detitr -> first).det () << " (and not DetId::Ecal)" << std::endl ;
+	          continue ;
+	        }
+	     if ( (detitr -> first).subdetId () != EcalBarrel) 
+	        {
+	          std::cout << " subdet is " << (detitr -> first).subdetId () << " (and not EcalBarrel)" << std::endl ; 
+	          continue ; 
+	        }
+	   
+	     // GFdoc now find it!
+	     EcalRecHitCollection::const_iterator thishit = theBarrelEcalRecHits->find ( (detitr -> first) ) ;
+	     if (thishit == theBarrelEcalRecHits->end ()) 
+	        {
+	          continue ;
+	        }
+	     //The checking above should no longer be needed... 
+	     //as only those in the cluster would already have rechits..
+	   
+	     // GFdoc this is one crystal in the basic cluster
+	     EcalRecHit myhit = (*thishit) ;
+	   
+             // SIC Feb 14 2011 -- Add check on RecHit flags (takes care of spike cleaning in 42X)
+             uint32_t rhFlag = myhit.recoFlag();
+             if( !(rhFlag == EcalRecHit::kGood || rhFlag == EcalRecHit::kOutOfTime ||
+                 rhFlag == EcalRecHit::kPoorCalib) )
+                 continue;
+	   
+	     // thisamp is the EB amplitude of the current rechit
+	     double thisamp  = myhit.energy () ;
+	     double thistime = myhit.time ();
+	     double thisChi2 = myhit.chi2 ();
+	     double thisOutOfTimeChi2 = myhit.outOfTimeChi2 ();
+
+	   
+	     EcalIntercalibConstantMap::const_iterator icalit = icalMap.find(detitr->first);
+	     EcalIntercalibConstant icalconst = 1;
+	     if( icalit!=icalMap.end() ) {
+	       icalconst = (*icalit);
+	     } else {
+	       edm::LogError("EcalTimePhyTreeMaker") << "No intercalib const found for xtal "
+						<< (detitr->first).rawId();
+   	     }
+	   
+	     // get laser coefficient
+	     float lasercalib = 1.;
+	     lasercalib = laser->getLaserCorrection( detitr->first, iEvent.time());
+	     // std::cout << "GF EB debug: " << lasercalib << std::endl;
+
+	     // discard rechits with A/sigma < 12
+	     if ( thisamp/(icalconst*lasercalib*adcToGeV) < (1.1*12) ) continue;
+
+	     if (thisamp > 0.027) //cut on energy->number of crystals in cluster above 3sigma noise; gf: desirable?
+             {  
+	        numXtalsinCluster++ ; 
+             }
+	     if (thisamp > secondMin) 
+             {
+	        secondMin = thisamp ; 
+		secondTime = myhit.time () ; 
+		secDet = (EBDetId) (detitr -> first) ;
+             }	
+	     if (secondMin > ampli) 
+	     {
+	        std::swap (ampli, secondMin) ; 
+	        std::swap (time, secondTime) ; 
+	        std::swap (maxDet, secDet) ;
+	     }
+
+	   
+	    if(myhit.isTimeErrorValid())
+              myTreeVariables_.xtalInBCTimeErr[numberOfClusters][numberOfXtalsInCluster]= myhit.timeError();
+            else
+              myTreeVariables_.xtalInBCTimeErr[numberOfClusters][numberOfXtalsInCluster]= -999999;
+
+	    // xtal variables inside a barrel basic cluster 
+	    myTreeVariables_.xtalInBCEnergy[numberOfClusters][numberOfXtalsInCluster]=       (float) thisamp;
+	    myTreeVariables_.xtalInBCTime[numberOfClusters][numberOfXtalsInCluster]=         (float) thistime; 
+	    myTreeVariables_.xtalInBCHashedIndex[numberOfClusters][numberOfXtalsInCluster]=  EBDetId (detitr -> first).hashedIndex () ; 
+	    myTreeVariables_.xtalInBCIEta[numberOfClusters][numberOfXtalsInCluster]=         EBDetId((detitr -> first)).ieta();
+	    myTreeVariables_.xtalInBCIPhi[numberOfClusters][numberOfXtalsInCluster]=         EBDetId((detitr -> first)).iphi();
+	    myTreeVariables_.xtalInBCIx[numberOfClusters][numberOfXtalsInCluster]=           -999999; 
+	    myTreeVariables_.xtalInBCIy[numberOfClusters][numberOfXtalsInCluster]=           -999999; 
+	    myTreeVariables_.xtalInBCFlag[numberOfClusters][numberOfXtalsInCluster]=         myhit.recoFlag(); 
+	    myTreeVariables_.xtalInBCAmplitudeADC[numberOfClusters][numberOfXtalsInCluster]= (float) thisamp/(icalconst*lasercalib*adcToGeV);
+	    myTreeVariables_.xtalInBCChi2[numberOfClusters][numberOfXtalsInCluster]=         thisChi2;
+	    myTreeVariables_.xtalInBCOutOfTimeChi2[numberOfClusters][numberOfXtalsInCluster]=thisOutOfTimeChi2;
+	    // note: SwissCross = 1 - E4/E1   
+            myTreeVariables_.xtalInBCSwissCross[numberOfClusters][numberOfXtalsInCluster] =
+             EcalTools::swissCross(detitr->first,*theBarrelEcalRecHits,0.5);
+
+  
+	    GlobalPoint pos = theGeometry->getPosition((myhit).detid());
+	    myTreeVariables_.xtalInBCEta[numberOfClusters][numberOfXtalsInCluster]=      pos.eta();
+	    myTreeVariables_.xtalInBCPhi[numberOfClusters][numberOfXtalsInCluster]=      pos.phi();
+	   
+	    numberOfXtalsInCluster++ ; // increment number of crystals in basic cluster
+	   
+	 } //end loop on rechits within barrel basic clusters
+       //////////////////////////////////////////////////////
+       
+       float E2 = (float)ampli + (float)secondMin ;
+       
+       //Set some more values for this cluster
+       myTreeVariables_.clusterMom[numberOfClusters] = numberOfSuperClusters ;
+       myTreeVariables_.CPIdx[numberOfClusters] = jidx ;
+       myTreeVariables_.clusterEnergy[numberOfClusters] = (float) energy ;
+       myTreeVariables_.clusterTransverseEnergy[numberOfClusters] = (float) transverseEnergy ;
+       myTreeVariables_.clusterTime[numberOfClusters] = (float) time ;
+       myTreeVariables_.clusterEta[numberOfClusters] = (float) eta ;
+       myTreeVariables_.clusterPhi[numberOfClusters] = (float) phi ;
+       myTreeVariables_.clusterE1[numberOfClusters] = (float) ampli ;
+       myTreeVariables_.clusterE2[numberOfClusters] = (float) E2 ;
+       myTreeVariables_.clusterXtalsAbove3Sigma[numberOfClusters] = numXtalsinCluster ;
+       myTreeVariables_.clusterXtals[numberOfClusters] = clusterDetIds.size () ;
+       myTreeVariables_.clusterMaxId[numberOfClusters] =  maxDet.rawId () ;
+       myTreeVariables_.clusterMaxId[numberOfClusters] =  secDet.rawId () ;
+       myTreeVariables_.nXtalsInCluster[numberOfClusters]= numberOfXtalsInCluster ;    
+       
+
+       // (basic) cluster shapes for barrel
+       if(FILL_SHAPE_VARS) {
+	 myTreeVariables_.clusterE2x2[numberOfClusters] = lazyTools -> e2x2(*clus);
+	 myTreeVariables_.clusterE3x2[numberOfClusters] = lazyTools -> e3x2(*clus);
+	 myTreeVariables_.clusterE3x3[numberOfClusters] = lazyTools -> e3x3(*clus);
+	 myTreeVariables_.clusterE4x4[numberOfClusters] = lazyTools -> e4x4(*clus);
+	 myTreeVariables_.clusterE5x5[numberOfClusters] = lazyTools -> e5x5(*clus);
+	 
+	 myTreeVariables_.clusterE2x5Right[numberOfClusters]  = lazyTools -> e2x5Right(*clus);
+	 myTreeVariables_.clusterE2x5Left[numberOfClusters]   = lazyTools -> e2x5Left(*clus);
+	 myTreeVariables_.clusterE2x5Top[numberOfClusters]    = lazyTools -> e2x5Top(*clus);
+	 myTreeVariables_.clusterE2x5Bottom[numberOfClusters] = lazyTools -> e2x5Bottom(*clus);
+	 
+	 myTreeVariables_.clusterCovEtaEta[numberOfClusters] = (lazyTools -> covariances(*clus))[0];
+	 myTreeVariables_.clusterCovPhiPhi[numberOfClusters] = (lazyTools -> covariances(*clus))[2];
+	 myTreeVariables_.clusterCovEtaPhi[numberOfClusters] = (lazyTools -> covariances(*clus))[1];
+	 
+	 myTreeVariables_.clusterLat[numberOfClusters] = (lazyTools -> lat( *clus ))[2];
+	 myTreeVariables_.clusterEtaLat[numberOfClusters] = (lazyTools -> lat( *clus ))[0];
+	 myTreeVariables_.clusterPhiLat[numberOfClusters] = (lazyTools -> lat( *clus ))[1];
+	 
+	 myTreeVariables_.clusterZernike20[numberOfClusters] = lazyTools -> zernike20(*clus);
+	 myTreeVariables_.clusterZernike42[numberOfClusters] = lazyTools -> zernike42(*clus);
+       }
+       numberOfClusters++ ;
+       
+     } //end (BASIC)cluster loop
+
+     if ( getC ) {
+        //cout<<"    SC "<< numberOfSuperClusters <<endl; 
+        myTreeVariables_.nClustersInSuperCluster[numberOfSuperClusters] = numberOfClusters - myTreeVariables_.nClusters ;
+        numberOfSuperClusters++ ;      
+        myTreeVariables_.nSuperClusters = numberOfSuperClusters;
+        myTreeVariables_.nClusters = numberOfClusters;
+     }
+     return ;
+} // end dumpBarrelClusterInfo  
+
+
+void EcalTimePhyTreeMaker::dumpJetEndcapClusterInfo (const edm::Event& iEvent,
+     				             const CaloGeometry * theGeometry,
+					     const CaloTopology * theCaloTopology,
+                                             const EcalRecHitCollection* theEndcapEcalRecHits,
+                                             const reco::BasicClusterCollection* theEndcapBasicClusters,
+					     EcalClusterLazyTools* lazyTools,
+					     const std::map<int,float> & XtalMap, 
+					     const std::map<int,float> & XtalMapCurved  )
+{            
+
+  const EcalIntercalibConstantMap& icalMap = ical->getMap();
+  float adcToGeV = float(agc->getEEValue());
+  
+  //numberOfSuperClusters = myTreeVariables_.nSuperClusters;
+  //numberOfClusters      = myTreeVariables_.nClusters;
+
+  /////////////////////////////////////////////////////////////////////////////////////////
+
+
+      ///////////////////////////////////////////////////////////////////////////////////////
+      // loop on endcap basic clusters 
+
+   bool getC = false;
+   for (reco::BasicClusterCollection::const_iterator clus = theEndcapBasicClusters->begin () ;
+        clus != theEndcapBasicClusters->end () && numberOfClusters<MAXC;  ++clus)  {
+
+          double energy = clus->energy () ;
+	  double phi    = clus->phi () ;
+	  double eta    = clus->eta () ;
+	  if  ( energy/cosh(eta) <minEtEE_ ) continue;
+	  double sinTheta         = fabs( sin( 2 *atan( exp(-1*clus->eta()) ) ) );
+	  double transverseEnergy = clus->energy () * sinTheta;
+	  double time = -1000.0 ; // gfdoc: work on this to provide a combination of crystals?
+	  double ampli = 0. ;
+	  double secondMin = 0. ;
+	  double secondTime = -1000. ;
+	  int numberOfXtalsInCluster=0 ;//counter for all xtals in cluster
+	  int numXtalsinCluster = 0 ;   //xtals in cluster above 3sigma noise  
+	  EEDetId maxDet ;
+          EEDetId secDet ;
+       
+          // matching SC from objects
+          float jidx = 100. ;
+          getC = false ;
+          for ( size_t i=0; i< selectedJets.size(); i++) {
+               bool matched = matching( clus->energy(), clus->position(), selectedJets[i]->vertex(), selectedJets[i]->p4() ) ;
+               jidx += 0.1 ;
+               if ( matched ) { 
+                  getC = true ;
+                  //cout <<" ** from jet "<<i <<" / "<< selectedJets.size() ;
+                  break ;
+               }
+          }
+          if ( !getC ) continue ;
+
+          //number of superClusters in event (collection = vector!)
+	  //myTreeVariables_.nSuperClusters += theEndcapSuperClusters->size () ;
+	  //myTreeVariables_.nEndcapSuperClusters = theEndcapSuperClusters->size () ;
+	  myTreeVariables_.SCPIdx[numberOfSuperClusters] = jidx ;
+          //cout<<" EJ Cl "<<numberOfClusters<<"  objId: "<< jidx <<" ->"<< myTreeVariables_.SCPIdx[numberOfSuperClusters]<<endl;
+	  myTreeVariables_.superClusterEta[numberOfSuperClusters] = -99999 ;
+	  myTreeVariables_.superClusterPhi[numberOfSuperClusters] = -99999 ;
+	  myTreeVariables_.superClusterX[numberOfSuperClusters] = -99999 ;
+	  myTreeVariables_.superClusterY[numberOfSuperClusters] = -99999 ;
+	  myTreeVariables_.superClusterZ[numberOfSuperClusters] = -99999 ;
+	  myTreeVariables_.superClusterRawEnergy[numberOfSuperClusters] = -999999 ;
+	  myTreeVariables_.superClusterPhiWidth[numberOfSuperClusters]  = -999999 ;
+	  myTreeVariables_.superClusterEtaWidth[numberOfSuperClusters]  = -999999 ; 
+          // GFdoc clusterDetIds holds crystals that participate to this basic cluster 
+          std::vector<std::pair<DetId, float> > clusterDetIds = clus->hitsAndFractions() ; //get these from the cluster
+       
+          //////////////////////////////////////////////////////////////////////////////////////
+          //loop on xtals in cluster
+          for (std::vector<std::pair<DetId, float> >::const_iterator detitr = clusterDetIds.begin () ; 
+	      detitr != clusterDetIds.end ()  && numberOfXtalsInCluster<MAXXTALINC; // && numberOfXtals<MAXXTAL ; 
+	      ++detitr)// loop on rechics of barrel basic clusters
+	   {
+
+	      // Here I use the "find" on a digi collection... I have been warned...   (GFdoc: ??)
+   	      // GFdoc: check if DetId belongs to ECAL; if so, find it among those if this basic cluster
+    	     if ( (detitr -> first).det () != DetId::Ecal) 
+	        { 
+   	          std::cout << " det is " << (detitr -> first).det () << " (and not DetId::Ecal)" << std::endl ;
+	          continue ;
+	        }
+	     if ( (detitr -> first).subdetId () != EcalEndcap) 
+	        {
+	          std::cout << " subdet is " << (detitr -> first).subdetId () << " (and not EcalEndcap)" << std::endl ; 
+	          continue ; 
+	        }
+	   
+	     // GFdoc now find it!
+             EcalRecHitCollection::const_iterator thishit = theEndcapEcalRecHits->find ( (detitr -> first) ) ;
+             if (thishit == theEndcapEcalRecHits->end ()) 
+	        {
+	          continue ;
+	        }
+	     //The checking above should no longer be needed... 
+	     //as only those in the cluster would already have rechits..
+	   
+	     // GFdoc this is one crystal in the basic cluster
+	     EcalRecHit myhit = (*thishit) ;
+	   
+             // SIC Feb 14 2011 -- Add check on RecHit flags (takes care of spike cleaning in 42X)
+             uint32_t rhFlag = myhit.recoFlag();
+             if( !(rhFlag == EcalRecHit::kGood || rhFlag == EcalRecHit::kOutOfTime ||
+                 rhFlag == EcalRecHit::kPoorCalib) )
+                 continue;
+	   
+	     // thisamp is the EE amplitude of the current rechit
+	     double thisamp  = myhit.energy () ;
+	     double thistime = myhit.time ();
+	     double thisChi2 = myhit.chi2 ();
+	     double thisOutOfTimeChi2 = myhit.outOfTimeChi2 ();
+
+	   
+	     EcalIntercalibConstantMap::const_iterator icalit = icalMap.find(detitr->first);
+	     EcalIntercalibConstant icalconst = 1;
+	     if( icalit!=icalMap.end() ) {
+	       icalconst = (*icalit);
+	     } else {
+	       edm::LogError("EcalTimePhyTreeMaker") << "No intercalib const found for xtal "
+						<< (detitr->first).rawId();
+   	     }
+	   
+	     // get laser coefficient
+	     float lasercalib = 1.;
+	     lasercalib = laser->getLaserCorrection( detitr->first, iEvent.time());
+	     // std::cout << "GF EE debug: " << lasercalib << std::endl;
+
+	     // discard rechits with A/sigma < 12
+	     if ( thisamp/(icalconst*lasercalib*adcToGeV) < (2.2*12) ) continue;
+
+	     if (thisamp > 0.027) //cut on energy->number of crystals in cluster above 3sigma noise; gf: desirable?
+             {  
+	        numXtalsinCluster++ ; 
+             }
+	     if (thisamp > secondMin) 
+             {
+	        secondMin = thisamp ; 
+		secondTime = myhit.time () ; 
+		secDet = (EEDetId) (detitr -> first) ;
+             }	
+	     if (secondMin > ampli) 
+	     {
+	        std::swap (ampli, secondMin) ; 
+	        std::swap (time, secondTime) ; 
+	        std::swap (maxDet, secDet) ;
+	     }
+
+	   
+	    if(myhit.isTimeErrorValid())
+              myTreeVariables_.xtalInBCTimeErr[numberOfClusters][numberOfXtalsInCluster]= myhit.timeError();
+            else
+              myTreeVariables_.xtalInBCTimeErr[numberOfClusters][numberOfXtalsInCluster]= -999999;
+
+	    // xtal variables inside a barrel basic cluster 
+	    myTreeVariables_.xtalInBCEnergy[numberOfClusters][numberOfXtalsInCluster]=       (float) thisamp;
+	    myTreeVariables_.xtalInBCTime[numberOfClusters][numberOfXtalsInCluster]=         (float) thistime; 
+	    myTreeVariables_.xtalInBCHashedIndex[numberOfClusters][numberOfXtalsInCluster]=  EEDetId (detitr -> first).hashedIndex () ; 
+	    myTreeVariables_.xtalInBCIEta[numberOfClusters][numberOfXtalsInCluster]=           -999999; 
+	    myTreeVariables_.xtalInBCIPhi[numberOfClusters][numberOfXtalsInCluster]=           -999999; 
+	    myTreeVariables_.xtalInBCIx[numberOfClusters][numberOfXtalsInCluster]=         EEDetId((detitr -> first)).ix();
+	    myTreeVariables_.xtalInBCIy[numberOfClusters][numberOfXtalsInCluster]=         EEDetId((detitr -> first)).iy();
+	    myTreeVariables_.xtalInBCFlag[numberOfClusters][numberOfXtalsInCluster]=         myhit.recoFlag(); 
+	    myTreeVariables_.xtalInBCAmplitudeADC[numberOfClusters][numberOfXtalsInCluster]= (float) thisamp/(icalconst*lasercalib*adcToGeV);
+	    myTreeVariables_.xtalInBCChi2[numberOfClusters][numberOfXtalsInCluster]=         thisChi2;
+	    myTreeVariables_.xtalInBCOutOfTimeChi2[numberOfClusters][numberOfXtalsInCluster]=thisOutOfTimeChi2;
+	    // note: SwissCross = 1 - E4/E1   
+            myTreeVariables_.xtalInBCSwissCross[numberOfClusters][numberOfXtalsInCluster] =
+             EcalTools::swissCross(detitr->first,*theEndcapEcalRecHits,0.5);
+
+            GlobalPoint pos = theGeometry->getPosition((myhit).detid());
+            myTreeVariables_.xtalInBCEta[numberOfClusters][numberOfXtalsInCluster]=      pos.eta();
+            myTreeVariables_.xtalInBCPhi[numberOfClusters][numberOfXtalsInCluster]=      pos.phi();
+  
+
+	    numberOfXtalsInCluster++ ; // increment number of crystals in basic cluster
+	   
+	 } //end loop on rechits within barrel basic clusters
+       //////////////////////////////////////////////////////
+       
+       float E2 = (float)ampli + (float)secondMin ;
+       
+       //Set some more values for this cluster
+       myTreeVariables_.clusterMom[numberOfClusters] = numberOfSuperClusters ;
+       myTreeVariables_.CPIdx[numberOfClusters] = jidx;
+       myTreeVariables_.clusterEnergy[numberOfClusters] = (float) energy ;
+       myTreeVariables_.clusterTransverseEnergy[numberOfClusters] = (float) transverseEnergy ;
+       myTreeVariables_.clusterTime[numberOfClusters] = (float) time ;
+       myTreeVariables_.clusterEta[numberOfClusters] = (float) eta ;
+       myTreeVariables_.clusterPhi[numberOfClusters] = (float) phi ;
+       myTreeVariables_.clusterE1[numberOfClusters] = (float) ampli ;
+       myTreeVariables_.clusterE2[numberOfClusters] = (float) E2 ;
+       myTreeVariables_.clusterXtalsAbove3Sigma[numberOfClusters] = numXtalsinCluster ;
+       myTreeVariables_.clusterXtals[numberOfClusters] = clusterDetIds.size () ;
+       myTreeVariables_.clusterMaxId[numberOfClusters] =  maxDet.rawId () ;
+       myTreeVariables_.clusterMaxId[numberOfClusters] =  secDet.rawId () ;
+       myTreeVariables_.nXtalsInCluster[numberOfClusters]= numberOfXtalsInCluster ;    
+       
+
+       // (basic) cluster shapes for barrel
+       if(FILL_SHAPE_VARS) {
+	 myTreeVariables_.clusterE2x2[numberOfClusters] = lazyTools -> e2x2(*clus);
+	 myTreeVariables_.clusterE3x2[numberOfClusters] = lazyTools -> e3x2(*clus);
+	 myTreeVariables_.clusterE3x3[numberOfClusters] = lazyTools -> e3x3(*clus);
+	 myTreeVariables_.clusterE4x4[numberOfClusters] = lazyTools -> e4x4(*clus);
+	 myTreeVariables_.clusterE5x5[numberOfClusters] = lazyTools -> e5x5(*clus);
+	 
+	 myTreeVariables_.clusterE2x5Right[numberOfClusters]  = lazyTools -> e2x5Right(*clus);
+	 myTreeVariables_.clusterE2x5Left[numberOfClusters]   = lazyTools -> e2x5Left(*clus);
+	 myTreeVariables_.clusterE2x5Top[numberOfClusters]    = lazyTools -> e2x5Top(*clus);
+	 myTreeVariables_.clusterE2x5Bottom[numberOfClusters] = lazyTools -> e2x5Bottom(*clus);
+	 
+	 myTreeVariables_.clusterCovEtaEta[numberOfClusters] = (lazyTools -> covariances(*clus))[0];
+	 myTreeVariables_.clusterCovPhiPhi[numberOfClusters] = (lazyTools -> covariances(*clus))[2];
+	 myTreeVariables_.clusterCovEtaPhi[numberOfClusters] = (lazyTools -> covariances(*clus))[1];
+	 
+	 myTreeVariables_.clusterLat[numberOfClusters] = (lazyTools -> lat( *clus ))[2];
+	 myTreeVariables_.clusterEtaLat[numberOfClusters] = (lazyTools -> lat( *clus ))[0];
+	 myTreeVariables_.clusterPhiLat[numberOfClusters] = (lazyTools -> lat( *clus ))[1];
+	 
+	 myTreeVariables_.clusterZernike20[numberOfClusters] = lazyTools -> zernike20(*clus);
+	 myTreeVariables_.clusterZernike42[numberOfClusters] = lazyTools -> zernike42(*clus);
+       }
+       
+       numberOfClusters++ ;
+     } //end (BASIC)cluster loop
+
+     if ( getC ) {
+        //cout<<"    SC "<< numberOfSuperClusters <<endl; 
+        myTreeVariables_.nClustersInSuperCluster[numberOfSuperClusters] = numberOfClusters - myTreeVariables_.nClusters ;
+        numberOfSuperClusters++ ;      
+        myTreeVariables_.nSuperClusters = numberOfSuperClusters;
+        myTreeVariables_.nClusters = numberOfClusters;
+     }
+     return ;
+} // end dumpEndcapClusterInfo  
 
 
 void
@@ -981,6 +1508,16 @@ EcalTimePhyTreeMaker::dump3Ginfo (const edm::Event& iEvent,
   return ;
 } //PG dump3Ginfo  
 
+bool EcalTimePhyTreeMaker::matching ( float sc_E, math::XYZPoint sc_pos, math::XYZPoint obj_v3, math::XYZTLorentzVector obj_p4 ) 
+{
+    math::XYZVector sc_v3( sc_pos.X() - obj_v3.X(), sc_pos.Y() - obj_v3.Y(), sc_pos.Z() - obj_v3.Z() );
+    double dR =  ROOT::Math::VectorUtil::DeltaR( sc_v3, obj_p4 ) ;
+    double dE =  obj_p4.E() - sc_E ;
+
+    bool matched = ( dR < 0.5 && dE > 0 ) ? true : false ;
+
+    return matched ;
+}
 
 
 // -------------------------------------------------------------------------------------------------------------

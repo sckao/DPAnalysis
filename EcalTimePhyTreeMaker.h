@@ -101,6 +101,15 @@ Implementation:
 #include "DataFormats/PatCandidates/interface/Electron.h"
 #include "DataFormats/PatCandidates/interface/Photon.h"
 #include "DataFormats/EgammaCandidates/interface/Photon.h"
+#include "DataFormats/ParticleFlowCandidate/interface/PFCandidate.h"
+#include "DataFormats/ParticleFlowReco/interface/PFBlock.h"
+#include "DataFormats/ParticleFlowReco/interface/PFBlockElement.h"
+
+#include "DataFormats/JetReco/interface/PFJetCollection.h"
+#include "DataFormats/METReco/interface/PFMETCollection.h"
+#include "DataFormats/MuonReco/interface/MuonFwd.h"
+#include "DataFormats/EgammaCandidates/interface/PhotonFwd.h"
+#include "DataFormats/EgammaCandidates/interface/GsfElectronFwd.h"
 
 #include <TMath.h>
 #include <Math/VectorUtil.h>
@@ -108,6 +117,7 @@ Implementation:
 // containers for vertices
 #include <DataFormats/VertexReco/interface/VertexFwd.h>
 
+typedef std::pair<reco::SuperClusterRef, float> ParticleSC  ;
 
 class EcalTimePhyTreeMaker : public edm::EDAnalyzer 
 {
@@ -154,12 +164,34 @@ class EcalTimePhyTreeMaker : public edm::EDAnalyzer
 				 const std::map<int,float> & XtalMap,
 				 const std::map<int,float> & XtalMapCurved,
 				 EcalTimePhyTreeContent & myTreeVariables_) ;
+
+      void dumpJetBarrelClusterInfo (const edm::Event& iEvent,
+                                 const CaloGeometry * theGeometry,
+				 const CaloTopology * theCaloTopology,
+				 const EcalRecHitCollection* theBarrelEcalRecHits,
+				 const reco::BasicClusterCollection* theBarrelBasicClusters,
+				 EcalClusterLazyTools* lazyTools,
+				 const std::map<int,float> & XtalMap,
+				 const std::map<int,float> & XtalMapCurved  ) ;
+
+      void dumpJetEndcapClusterInfo (const edm::Event& iEvent,
+                                 const CaloGeometry * theGeometry,
+				 const CaloTopology * theCaloTopology,
+				 const EcalRecHitCollection* theEndcapEcalRecHits,
+				 const reco::BasicClusterCollection* theEndcapBasicClusters,
+				 EcalClusterLazyTools* lazyTools,
+				 const std::map<int,float> & XtalMap,
+				 const std::map<int,float> & XtalMapCurved  ) ;
+
       
       void dumpVertexInfo(const reco::VertexCollection* recVtxs, EcalTimePhyTreeContent & myTreeVariables_);
  
       //! dump trigger information
       void dump3Ginfo (const edm::Event& iEvent, const edm::EventSetup& eventSetup,
                        EcalTimePhyTreeContent & myTreeVariables_) ;
+  
+      bool matching ( float sc_Energy, math::XYZPoint sc_pos, math::XYZPoint obj_v3, math::XYZTLorentzVector obj_p4 ) ;
+
         //! collect trigger information to be dumped
       std::vector<bool> determineTriggers (const edm::Event& iEvent, 
                                            const edm::EventSetup& eventSetup, int Bx=0) ;
@@ -212,6 +244,15 @@ class EcalTimePhyTreeMaker : public edm::EDAnalyzer
       edm::ESHandle<EcalIntercalibConstants> ical;
       edm::ESHandle<EcalADCToGeVConstant> agc;
       edm::ESHandle<EcalLaserDbService> laser;
+
+      std::vector<const pat::Jet*> selectedJets ;
+      std::vector<const pat::Electron*> selectedElectrons ;
+      std::vector<const pat::Muon*> selectedMuons ;
+      std::vector<const pat::Photon*> selectedPhotons ;
+      std::vector<ParticleSC> sclist ;
+
+      int numberOfSuperClusters ;
+      int numberOfClusters ;
 
 } ;
 

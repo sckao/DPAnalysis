@@ -20,10 +20,15 @@ ecalTimePhyTree = cms.EDAnalyzer("EcalTimePhyTreeMaker",
     patElectronSource = cms.InputTag("selectedPatElectronsPFlow"),
     #patPhotonSource = cms.InputTag("photons"),
     patPhotonSource = cms.InputTag("selectedPatPhotons"),
+    # jet cuts                      Pt  eta                                  
     jetCuts          = cms.vdouble( 30, 2.4 ),
+    # MET cuts                      Et                                   
     metCuts          = cms.vdouble( 20 ),
+    # photon cuts                   Pt  eta  dR(photon, jets)                                 
     photonCuts       = cms.vdouble( 30, 2.4, 0.3 ),
+    # electron cuts                 Pt  eta  iso   dR(photon, jets)                                 
     electronCuts     = cms.vdouble( 25, 2.4, 0.15, 0.3 ),
+    # muon cuts                     Pt  eta  iso  dR(photon, jets)                                 
     muonCuts         = cms.vdouble( 25, 2.1, 0.2, 0.3 ),
     vertexCollection  = cms.InputTag("offlinePrimaryVertices",""),
                                

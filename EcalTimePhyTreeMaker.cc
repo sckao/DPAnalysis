@@ -240,25 +240,27 @@ void EcalTimePhyTreeMaker::analyze (const edm::Event& iEvent, const edm::EventSe
   numberOfClusters = 0;
   sclist.clear() ;
 
-  dumpPATObjectInfo( iEvent ) ;
+  bool passed = dumpPATObjectInfo( iEvent ) ;
 
-  dump3Ginfo(iEvent, iSetup, myTreeVariables_) ;
+  if ( passed ) {
+     dump3Ginfo(iEvent, iSetup, myTreeVariables_) ;
   
-  dumpBarrelClusterInfo(iEvent, theGeometry, theCaloTopology,
+     dumpBarrelClusterInfo(iEvent, theGeometry, theCaloTopology,
 			theBarrelEcalRecHits, 
 			theBarrelBasicClusters, theBarrelSuperClusters, lazyTools, XtalMap, XtalMapCurved, myTreeVariables_) ;
-  dumpEndcapClusterInfo(iEvent, theGeometry, theCaloTopology,
+     dumpEndcapClusterInfo(iEvent, theGeometry, theCaloTopology,
 			theEndcapEcalRecHits, 
 			theEndcapBasicClusters, theEndcapSuperClusters, lazyTools, XtalMap, XtalMapCurved, myTreeVariables_) ;
 
-  dumpJetBarrelClusterInfo(iEvent, theGeometry, theCaloTopology, theBarrelEcalRecHits, 
+     dumpJetBarrelClusterInfo(iEvent, theGeometry, theCaloTopology, theBarrelEcalRecHits, 
                            theBarrelBasicClusters, lazyTools, XtalMap, XtalMapCurved ) ;
-  dumpJetEndcapClusterInfo(iEvent, theGeometry, theCaloTopology, theEndcapEcalRecHits, 
+     dumpJetEndcapClusterInfo(iEvent, theGeometry, theCaloTopology, theEndcapEcalRecHits, 
                            theEndcapBasicClusters, lazyTools, XtalMap, XtalMapCurved ) ;
   
-  dumpVertexInfo(theRecVtxs, myTreeVariables_);
+     dumpVertexInfo(theRecVtxs, myTreeVariables_);
 
-  tree_ -> Fill();
+     tree_ -> Fill();
+  }
 }
 
 
@@ -304,21 +306,21 @@ std::string EcalTimePhyTreeMaker::intToString (int num)
 
 
 // -----------------------------------------------------------------------------------------
-void EcalTimePhyTreeMaker::dumpPATObjectInfo (const edm::Event& iEvent )
+bool EcalTimePhyTreeMaker::dumpPATObjectInfo (const edm::Event& iEvent )
 {
-   edm::Handle<std::vector<pat::Muon> > muons;
-   iEvent.getByLabel(patMuonSource_, muons);
-   edm::Handle<std::vector<pat::Electron> > electrons;
-   iEvent.getByLabel(patElectronSource_, electrons);
-   edm::Handle<std::vector<pat::MET> > mets;
-   iEvent.getByLabel(patMETSource_, mets);
-   edm::Handle<std::vector<pat::Jet> > jets;
-   iEvent.getByLabel(patJetSource_, jets);
+   edm::Handle<reco::PhotonCollection> photons; 
+   edm::Handle<reco::ElectronCollection> electrons; 
+   edm::Handle<reco::MuonCollection> muons; 
+   edm::Handle<reco::PFJetCollection> jets; 
+   edm::Handle<reco::PFMETCollection> mets; 
 
-   edm::Handle<std::vector<pat::Photon> > photons;
    iEvent.getByLabel(patPhotonSource_, photons);
+   iEvent.getByLabel(patElectronSource_, electrons);
+   iEvent.getByLabel(patMuonSource_, muons);
+   iEvent.getByLabel(patJetSource_, jets);
+   iEvent.getByLabel(patMETSource_, mets);
    
-   for (std::vector<pat::MET>::const_iterator it = mets->begin(); it != mets->end(); it++) {
+   for(reco::PFMETCollection::const_iterator it = mets->begin(); it != mets->end(); it++) {
        if ( it->pt() < metCuts_[0]  ) continue ;
        myTreeVariables_.met = it->et() ;
        myTreeVariables_.metPx = it->px() ;
@@ -326,7 +328,7 @@ void EcalTimePhyTreeMaker::dumpPATObjectInfo (const edm::Event& iEvent )
    }
 
    selectedJets.clear() ;
-   for (std::vector<pat::Jet>::const_iterator it = jets->begin(); it != jets->end(); it++) {
+   for(reco::PFJetCollection::const_iterator it = jets->begin(); it != jets->end(); it++) {
        if ( it->pt() < jetCuts_[0] || fabs( it->eta() ) > jetCuts_[1] ) continue ;
        // Jet ID cuts
        if ( it->numberOfDaughters() < 2 )               continue ;
@@ -340,9 +342,10 @@ void EcalTimePhyTreeMaker::dumpPATObjectInfo (const edm::Event& iEvent )
 
    selectedElectrons.clear() ;
    float eidx = 11. ;
-   for (std::vector<pat::Electron>::const_iterator it = electrons->begin(); it != electrons->end(); it++) {
+   for(reco::ElectronCollection::const_iterator it = electrons->begin(); it != electrons->end(); it++) {
        if ( it->pt() < electronCuts_[0] || fabs( it->eta() ) > electronCuts_[1] ) continue ;
-       double relIso =  ( it->chargedHadronIso()+ it->neutralHadronIso() + it->photonIso () ) / it->pt();
+       //double relIso =  ( it->chargedHadronIso()+ it->neutralHadronIso() + it->photonIso () ) / it->pt();
+       double relIso = 0. ;
        if ( relIso > electronCuts_[2] ) continue ;
        double dR = 999. ;
        for (size_t j=0; j < selectedJets.size(); j++ ) {
@@ -359,9 +362,10 @@ void EcalTimePhyTreeMaker::dumpPATObjectInfo (const edm::Event& iEvent )
 
    selectedMuons.clear() ;
    float midx = 13.0 ;
-   for (std::vector<pat::Muon>::const_iterator it = muons->begin(); it != muons->end(); it++) {
+   for(reco::MuonCollection::const_iterator it = muons->begin(); it != muons->end(); it++) {
        if ( it->pt() < muonCuts_[0] || fabs( it->eta() ) > muonCuts_[1] ) continue ;
-       double relIso =  ( it->chargedHadronIso()+ it->neutralHadronIso() + it->photonIso () ) / it->pt();
+       //double relIso =  ( it->chargedHadronIso()+ it->neutralHadronIso() + it->photonIso () ) / it->pt();
+       double relIso =0. ;
        if ( relIso > muonCuts_[2] ) continue ;
        double dR = 999. ;
        for (size_t j=0; j < selectedJets.size(); j++ ) {
@@ -376,7 +380,7 @@ void EcalTimePhyTreeMaker::dumpPATObjectInfo (const edm::Event& iEvent )
 
    selectedPhotons.clear() ;
    float gidx = 22.0 ;
-   for (std::vector<pat::Photon>::const_iterator it = photons->begin(); it != photons->end(); it++) {
+   for(reco::PhotonCollection::const_iterator it = photons->begin(); it != photons->end(); it++) {
        if ( it->pt() < photonCuts_[0] || fabs( it->eta() ) > photonCuts_[1] ) continue ;
        double dR = 999 ;
        for (size_t j=0; j < selectedJets.size(); j++ ) {
@@ -389,14 +393,23 @@ void EcalTimePhyTreeMaker::dumpPATObjectInfo (const edm::Event& iEvent )
        selectedPhotons.push_back( &(*it) ) ;
    }
 
+   int nJet   = static_cast<int> ( selectedJets.size() ) ;
+   int nEle   = static_cast<int> ( selectedElectrons.size() ) ;
+   int nPho   = static_cast<int> ( selectedPhotons.size() ) ;
+   int nMuon  = static_cast<int> ( selectedMuons.size() ) ;
+
+   bool pass = true ;
+   if ( nPho< photonCuts_[3] ) pass = false ;
+   if ( nJet < jetCuts_[3] ) pass = false ;
+
    // fill out the information
-   for ( size_t k=0; k< selectedJets.size(); k++ ) {
-       if ( k >= 10 ) break ;
-       myTreeVariables_.jetPx[k] = selectedJets[k]->p4().Px() ;
-       myTreeVariables_.jetPy[k] = selectedJets[k]->p4().Py() ;
-       myTreeVariables_.jetPz[k] = selectedJets[k]->p4().Pz() ;
-       myTreeVariables_.jetE[k]  = selectedJets[k]->p4().E()  ;
-       
+   if ( pass ) {
+      for ( size_t k=0; k< selectedJets.size(); k++ ) {
+          if ( k >= 10 ) break ;
+	  myTreeVariables_.jetPx[k] = selectedJets[k]->p4().Px() ;
+	  myTreeVariables_.jetPy[k] = selectedJets[k]->p4().Py() ;
+	  myTreeVariables_.jetPz[k] = selectedJets[k]->p4().Pz() ;
+	  myTreeVariables_.jetE[k]  = selectedJets[k]->p4().E()  ;
        /*
        const std::vector< reco::PFCandidatePtr > pfCands = selectedJets[k]->getPFConstituents() ;
        cout<<" pfcand size = "<< pfCands.size() << endl;
@@ -414,41 +427,41 @@ void EcalTimePhyTreeMaker::dumpPATObjectInfo (const edm::Event& iEvent )
            }
            //reco::SuperClusterRef scRefs = pfCands[j]->superClusterRef() ;
            //if ( !scRefs.isNull() ) cout<<" raw E from Jet "<< scRefs.get()->rawEnergy() << endl;
-           
        }*/
-       
-   }
-   //cout<<" sc collection = "<< sclist.size() ; 
-   //cout<<" N_e: "<< selectedElectrons.size() <<" N g: "<< selectedPhotons.size() ;
-   //cout<<" N_m: "<< selectedMuons.size() <<" N_J:" << selectedJets.size() << endl;
-   myTreeVariables_.nJets = static_cast<int> ( selectedJets.size() ) ;
+      }
+      //cout<<" sc collection = "<< sclist.size() ; 
+      //cout<<" N_e: "<< selectedElectrons.size() <<" N g: "<< selectedPhotons.size() ;
+      //cout<<" N_m: "<< selectedMuons.size() <<" N_J:" << selectedJets.size() << endl;
+      myTreeVariables_.nJets = nJet ;
 
-   for ( size_t k=0; k< selectedMuons.size(); k++ ) {
-       if ( k >= 10 ) break ;
-       myTreeVariables_.muPx[k] = selectedMuons[k]->p4().Px() ;
-       myTreeVariables_.muPy[k] = selectedMuons[k]->p4().Py() ;
-       myTreeVariables_.muPz[k] = selectedMuons[k]->p4().Pz() ;
-       myTreeVariables_.muE[k] = selectedMuons[k]->p4().E() ;
-   }
-   myTreeVariables_.nMuons = static_cast<int> ( selectedMuons.size() ) ;
+      for ( size_t k=0; k< selectedMuons.size(); k++ ) {
+          if ( k >= 10 ) break ;
+	  myTreeVariables_.muPx[k] = selectedMuons[k]->p4().Px() ;
+	  myTreeVariables_.muPy[k] = selectedMuons[k]->p4().Py() ;
+	  myTreeVariables_.muPz[k] = selectedMuons[k]->p4().Pz() ;
+	  myTreeVariables_.muE[k] = selectedMuons[k]->p4().E() ;
+      }
+      myTreeVariables_.nMuons = nMuon ;
 
-   for ( size_t k=0; k< selectedElectrons.size(); k++ ) {
-       if ( k >= 10 ) break ;
-       myTreeVariables_.elePx[k] = selectedElectrons[k]->p4().Px() ;
-       myTreeVariables_.elePy[k] = selectedElectrons[k]->p4().Py() ;
-       myTreeVariables_.elePz[k] = selectedElectrons[k]->p4().Pz() ;
-       myTreeVariables_.eleE[k] = selectedElectrons[k]->p4().E() ;
-   }
-   myTreeVariables_.nElectrons = static_cast<int> ( selectedElectrons.size() ) ;
+      for ( size_t k=0; k< selectedElectrons.size(); k++ ) {
+          if ( k >= 10 ) break ;
+	  myTreeVariables_.elePx[k] = selectedElectrons[k]->p4().Px() ;
+	  myTreeVariables_.elePy[k] = selectedElectrons[k]->p4().Py() ;
+	  myTreeVariables_.elePz[k] = selectedElectrons[k]->p4().Pz() ;
+	  myTreeVariables_.eleE[k] = selectedElectrons[k]->p4().E() ;
+      }
+      myTreeVariables_.nElectrons = nEle ;
 
-   for ( size_t k=0; k< selectedPhotons.size(); k++ ) {
-       if ( k >= 10 ) break ;
-       myTreeVariables_.phoPx[k] = selectedPhotons[k]->p4().Px() ;
-       myTreeVariables_.phoPy[k] = selectedPhotons[k]->p4().Py() ;
-       myTreeVariables_.phoPz[k] = selectedPhotons[k]->p4().Pz() ;
-       myTreeVariables_.phoE[k] = selectedPhotons[k]->p4().E() ;
+      for ( size_t k=0; k< selectedPhotons.size(); k++ ) {
+          if ( k >= 10 ) break ;
+	  myTreeVariables_.phoPx[k] = selectedPhotons[k]->p4().Px() ;
+	  myTreeVariables_.phoPy[k] = selectedPhotons[k]->p4().Py() ;
+	  myTreeVariables_.phoPz[k] = selectedPhotons[k]->p4().Pz() ;
+	  myTreeVariables_.phoE[k] = selectedPhotons[k]->p4().E() ;
+      }
+      myTreeVariables_.nPhotons = nPho ;
    }
-   myTreeVariables_.nPhotons = static_cast<int> ( selectedPhotons.size() ) ;
+   return pass ;
 
 } 
 

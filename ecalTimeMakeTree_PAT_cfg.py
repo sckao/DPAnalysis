@@ -47,15 +47,12 @@ process.ecalTimePhyTree.endcapSuperClusterCollection = cms.InputTag("correctedMu
 process.ecalTimePhyTree.muonCollection = cms.InputTag("muons")
 process.ecalTimePhyTree.runNum = 0
 # Set up cuts for physics objects
-# jet cuts                                           pt    eta  
-process.ecalTimePhyTree.jetCuts       = cms.vdouble( 25. , 2.4 )
-# MET cuts                                           Et                                   
+# jet cuts                                           pt    eta  nJets
+process.ecalTimePhyTree.jetCuts       = cms.vdouble( 25. , 2.4, 3 )
 process.ecalTimePhyTree.metCuts       = cms.vdouble( 20  )
-# photon cuts                                        pt  eta  dR(photon, jets)
-process.ecalTimePhyTree.photonCuts    = cms.vdouble( 30, 2.4, 0.3 )
-# electron cuts                                      Pt  eta  iso   dR(electron, jets) 
+# photon cuts                                        pt  eta  dR   nPhoton
+process.ecalTimePhyTree.photonCuts    = cms.vdouble( 30, 2.4, 0.3, 1 )
 process.ecalTimePhyTree.electronCuts  = cms.vdouble( 25, 2.4, 0.15, 0.3 )
-# muon cuts                                          Pt  eta  iso  dR(muon, jets)
 process.ecalTimePhyTree.muonCuts      = cms.vdouble( 25, 2.1, 0.2, 0.3 )
 
 

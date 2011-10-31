@@ -109,6 +109,8 @@ Implementation:
 #include "DataFormats/METReco/interface/PFMETCollection.h"
 #include "DataFormats/MuonReco/interface/MuonFwd.h"
 #include "DataFormats/EgammaCandidates/interface/PhotonFwd.h"
+#include "DataFormats/EgammaCandidates/interface/ElectronFwd.h"
+#include "DataFormats/EgammaCandidates/interface/Electron.h"
 #include "DataFormats/EgammaCandidates/interface/GsfElectronFwd.h"
 
 #include <TMath.h>
@@ -139,7 +141,7 @@ class EcalTimePhyTreeMaker : public edm::EDAnalyzer
       void initHists (int) ;
 
 
-      void dumpPATObjectInfo( const edm::Event& iEvent ) ;
+      bool dumpPATObjectInfo( const edm::Event& iEvent ) ;
 
       //! dump Cluster information
       //! has to run after dumpMUinfo, to have the XtalMap already filled
@@ -245,10 +247,10 @@ class EcalTimePhyTreeMaker : public edm::EDAnalyzer
       edm::ESHandle<EcalADCToGeVConstant> agc;
       edm::ESHandle<EcalLaserDbService> laser;
 
-      std::vector<const pat::Jet*> selectedJets ;
-      std::vector<const pat::Electron*> selectedElectrons ;
-      std::vector<const pat::Muon*> selectedMuons ;
-      std::vector<const pat::Photon*> selectedPhotons ;
+      std::vector<const reco::PFJet*> selectedJets ;
+      std::vector<const reco::Electron*> selectedElectrons ;
+      std::vector<const reco::Muon*> selectedMuons ;
+      std::vector<const reco::Photon*> selectedPhotons ;
       std::vector<ParticleSC> sclist ;
 
       int numberOfSuperClusters ;

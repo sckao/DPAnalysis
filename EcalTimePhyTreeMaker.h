@@ -248,7 +248,7 @@ class EcalTimePhyTreeMaker : public edm::EDAnalyzer
       edm::ESHandle<EcalLaserDbService> laser;
 
       std::vector<const reco::PFJet*> selectedJets ;
-      std::vector<const reco::Electron*> selectedElectrons ;
+      std::vector<const reco::GsfElectron*> selectedElectrons ;
       std::vector<const reco::Muon*> selectedMuons ;
       std::vector<const reco::Photon*> selectedPhotons ;
       std::vector<ParticleSC> sclist ;

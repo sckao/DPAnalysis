@@ -309,7 +309,7 @@ std::string EcalTimePhyTreeMaker::intToString (int num)
 bool EcalTimePhyTreeMaker::dumpPATObjectInfo (const edm::Event& iEvent )
 {
    edm::Handle<reco::PhotonCollection> photons; 
-   edm::Handle<reco::ElectronCollection> electrons; 
+   edm::Handle<reco::GsfElectronCollection> electrons; 
    edm::Handle<reco::MuonCollection> muons; 
    edm::Handle<reco::PFJetCollection> jets; 
    edm::Handle<reco::PFMETCollection> mets; 
@@ -342,7 +342,7 @@ bool EcalTimePhyTreeMaker::dumpPATObjectInfo (const edm::Event& iEvent )
 
    selectedElectrons.clear() ;
    float eidx = 11. ;
-   for(reco::ElectronCollection::const_iterator it = electrons->begin(); it != electrons->end(); it++) {
+   for(reco::GsfElectronCollection::const_iterator it = electrons->begin(); it != electrons->end(); it++) {
        if ( it->pt() < electronCuts_[0] || fabs( it->eta() ) > electronCuts_[1] ) continue ;
        //double relIso =  ( it->chargedHadronIso()+ it->neutralHadronIso() + it->photonIso () ) / it->pt();
        double relIso = 0. ;
@@ -364,8 +364,13 @@ bool EcalTimePhyTreeMaker::dumpPATObjectInfo (const edm::Event& iEvent )
    float midx = 13.0 ;
    for(reco::MuonCollection::const_iterator it = muons->begin(); it != muons->end(); it++) {
        if ( it->pt() < muonCuts_[0] || fabs( it->eta() ) > muonCuts_[1] ) continue ;
+       // Isolation for PAT muon
        //double relIso =  ( it->chargedHadronIso()+ it->neutralHadronIso() + it->photonIso () ) / it->pt();
-       double relIso =0. ;
+       // Isolation for RECO muon
+       double relIso = 0. ;
+       if ( it->isIsolationValid() ) {
+          relIso = ( it->isolationR05().emEt + it->isolationR05().hadEt + it->isolationR05().sumPt ) / it->pt();
+       }
        if ( relIso > muonCuts_[2] ) continue ;
        double dR = 999. ;
        for (size_t j=0; j < selectedJets.size(); j++ ) {

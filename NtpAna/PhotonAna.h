@@ -28,9 +28,9 @@
 #include "AnaInput.h"
 #include "Histograms.h"
 
-#define MAXSC 50
-#define MAXC 200
-#define MAXXTALINC 25 
+#define MAXSC 51
+#define MAXC 201
+#define MAXXTALINC 26 
 #define MAXVTX 40
 #define MAXHCALRECHITS 100
 #define MAXCALOTOWERS 100
@@ -42,15 +42,7 @@
 #define MAXPHO 10
 #define MAXOBJ 50
 
-
 class PhotonAna : public TObject {
-
-private:
-
-   AnaInput*       Input;
-
-   string hfolder ;
-   string plotType ;
 
 public:
 
@@ -60,6 +52,14 @@ public:
    void test();
    void ReadTree();
 
+private:
+
+   AnaInput*       Input;
+
+   string hfolder ;
+   string plotType ;
+   int ProcessEvents ;
+    
    //ClassDef(PhotonAna, 1);
 
 };

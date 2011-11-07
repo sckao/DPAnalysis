@@ -51,21 +51,25 @@ class hJetTime : public hObj {
    jet1xT   = new TH1D("jet1xT",   " 2nd jet Time spectrum from xtals", 200,   -5., 5.);
 
    jet0Pt_T = new TH2D("jet0Pt_T", " leading jet Pt vs Time", 40,   0., 800., 80,  -4., 4.) ;
+   c1 = new TCanvas("c1","", 800, 600);
+   c2 = new TCanvas("c2","", 800, 600);
 
   }
 
   virtual ~hJetTime(){
+
     delete nJets ;
     delete nPhotons ;
+    delete pho0Pt ;
+    delete pho0T ;
     delete jet0Pt ;
     delete jet1Pt ;
     delete jet0T ;
     delete jet1T ;
-    delete pho0Pt ;
-    delete pho0T ;
    
     delete jet0xT ;
     delete jet1xT ;
+
     delete jet0Pt_T ;    
 
     delete c1 ;
@@ -74,7 +78,6 @@ class hJetTime : public hObj {
 
   void Draw( string hfolder, string plotType ) {
 
-      c1 = new TCanvas("c1","", 800, 600);
       c1->SetFillColor(10);
       c1->SetFillColor(10);
       c1->Divide(2,2);
@@ -99,11 +102,12 @@ class hJetTime : public hObj {
       pho0Pt->Draw() ;
       c1->Update();
 
-      TString plotname1 = hfolder + "test1" + "."+plotType ;
+      TString plotname1 = hfolder + "event" + "."+plotType ;
       c1->Print( plotname1 );
 
+      cout<<" draw 1 "<<endl;
+
       gStyle->SetOptStat("erm");
-      c2 = new TCanvas("c2","", 800, 600);
       c2->SetFillColor(10);
       c2->SetFillColor(10);
       c2->Divide(2,2);
@@ -140,8 +144,10 @@ class hJetTime : public hObj {
       jet0Pt_T->Draw("COLZ") ;
       c2->Update();
 
-      TString plotname2 = hfolder + "test2" + "."+plotType ;
+      TString plotname2 = hfolder + "time" + "."+plotType ;
       c2->Print( plotname2 );
+
+      cout<<" draw 2 "<<endl;
   }
 
   TH1D* nJets ;
@@ -160,5 +166,7 @@ class hJetTime : public hObj {
   TCanvas* c1 ;
   TCanvas* c2 ;
   //ClassDef(hJetTime, 1);
+  private:
+
 };
 #endif

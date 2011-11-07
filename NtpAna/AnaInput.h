@@ -36,7 +36,9 @@ public:
    AnaInput();     
    ~AnaInput();     
 
-   vector<TTree*> GetForest( string DataSet, TString treeName );
+   void GetForest( string DataSet, TString treeName );
+
+   TTree* TreeMap( string fileName ) ;
 
    TTree* GetTree( string fName, TString treeName, TFile* file = NULL );
 

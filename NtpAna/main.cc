@@ -23,11 +23,11 @@ int main() {
   vector<int> module;
   Input->GetParameters( "Module", &module );
 
-  vector<string> RealData ;
-  Input->GetParameters( "TheData", &RealData );
+  Input->GetForest("TheData", "EcalTimeAnalysis");
 
   photonAna->ReadTree() ;
-
+  cout<<" fk4 "<<endl;
   return 0;
+
 }
 

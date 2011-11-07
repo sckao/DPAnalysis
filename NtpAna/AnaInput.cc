@@ -7,11 +7,14 @@ AnaInput::AnaInput() {
 
 AnaInput::~AnaInput(){
 
+   cout<<" close input "<<endl ;
 
 }
 
+vector<TTree*> forestData ;
 
-vector<TTree*> AnaInput::GetForest( string DataSet, TString treeName ) {
+// GetForest , run first
+void AnaInput::GetForest( string DataSet, TString treeName ) {
 
     cout<<"  =>>> getting a forest of "<< treeName <<endl ;
     vector<string> fileList;
@@ -20,9 +23,21 @@ vector<TTree*> AnaInput::GetForest( string DataSet, TString treeName ) {
     vector<TTree*> forest ;
     for ( size_t i =0 ; i< fileList.size(); i++ ) {
         TTree* tr = GetTree( fileList[i], treeName ) ;
-        forest.push_back( tr );
+        forestData.push_back( tr );
     }
-    return forest ;
+}
+
+TTree* AnaInput::TreeMap( string fileName ){
+
+    vector<string> f0Names ;
+    GetParameters( "TheData", &f0Names );
+
+    TTree* theTr = 0;
+    for ( size_t i=0; i< f0Names.size(); i++ ) {
+        if ( f0Names[i] == fileName ) theTr = forestData[i] ;
+    }
+
+    return theTr ;
 }
 
 // get the tree from a specific file(s)

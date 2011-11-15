@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <stdio.h>
 #include <TString.h>
+#include <TSystem.h>
 #include <TFile.h>
 #include <TTree.h>
 #include <TMinuit.h>
@@ -19,14 +20,13 @@ int main() {
 
   AnaInput        *Input = new AnaInput();
   PhotonAna   *photonAna = new PhotonAna();
-  
-  vector<int> module;
-  Input->GetParameters( "Module", &module );
+  //vector<int> module;
+  //Input->GetParameters( "Module", &module );
 
   Input->GetForest("TheData", "EcalTimeAnalysis");
 
   photonAna->ReadTree() ;
-  cout<<" fk4 "<<endl;
+  photonAna->ScalarPlotList() ;
   return 0;
 
 }

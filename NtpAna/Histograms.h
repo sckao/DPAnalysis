@@ -41,18 +41,44 @@ class hJetTime : public hObj {
 
    nJets    = new TH1D("nJets",    " N of jets ", 11,  0, 11);
    nPhotons = new TH1D("nPhotons", " N of photons ", 11,  0, 11);
-   pho0Pt   = new TH1D("pho0Pt",   " leading photon Pt spectrum ", 50,   0., 1000.);
-   pho0T    = new TH1D("pho0T",    " leading photon Time spectrum ", 200,   -5., 5.);
-   jet0Pt   = new TH1D("jet0Pt",   " leading jet Pt spectrum ", 50,   0., 1000.);
-   jet1Pt   = new TH1D("jet1Pt",   " 2nd jet Pt spectrum ", 50,   0., 1000.);
-   jet0T    = new TH1D("jet0T",    " leading jet Time spectrum ", 200,   -5., 5.);
-   jet1T    = new TH1D("jet1T",    " 2nd jet Time spectrum ", 200,   -5., 5.);
-   jet0xT   = new TH1D("jet0xT",   " leading jet Time spectrum from xtals", 200,   -5., 5.);
-   jet1xT   = new TH1D("jet1xT",   " 2nd jet Time spectrum from xtals", 200,   -5., 5.);
+   nElectrons = new TH1D("nElectrons", " N of electrons ", 11,  0, 11);
+   ele0Pt   = new TH1D("ele0Pt",   " leading electron Pt spectrum", 50,   0., 1000.);
 
-   jet0Pt_T = new TH2D("jet0Pt_T", " leading jet Pt vs Time", 40,   0., 800., 80,  -4., 4.) ;
+   pho0Pt   = new TH1D("pho0Pt",   " leading photon Pt spectrum ", 50,   0., 1000.);
+   pho0T    = new TH1D("pho0T",    " leading photon Time spectrum ", 160, -4., 4.);
+   pho0xT   = new TH1D("pho0xT",   " leading photon Time spectrum from xtals ", 160, -4., 4.);
+   pho0lT   = new TH1D("pho0lT",   " leading photon Time spectrum from leading xtals ", 160, -4., 4.);
+
+   jet0Pt   = new TH1D("jet0Pt",   " leading jet Pt spectrum ", 50,   0., 1000.);
+   jet0T    = new TH1D("jet0T",    " leading jet Time spectrum from BC", 160, -4., 4.);
+   jet0xT   = new TH1D("jet0xT",   " leading jet Time spectrum from xtals", 160, -4., 4.);
+   jet0lT   = new TH1D("jet0lT",   " leading jet Time spectrum from leading xtals", 160, -4., 4.);
+
+   jet1Pt   = new TH1D("jet1Pt",   " 2nd jet Pt spectrum ", 50,   0., 1000.);
+   jet1T    = new TH1D("jet1T",    " 2nd jet Time spectrum from BC", 160, -4., 4.);
+   jet1xT   = new TH1D("jet1xT",   " 2nd jet Time spectrum from xtals", 160, -4., 4.);
+   jet1lT   = new TH1D("jet1lT",   " 2nd jet Time spectrum from leading xtals", 160, -4., 4.);
+
+   phoXtalTErr  = new TH1D("phoXtalTErr",  " xtal Time Error from photon", 200,   -1., 9.);
+   phoXtalTime  = new TH1D("phoXtalTime",  " xtal Time       from photon", 160, -4., 4.);
+   jetXtalTErr  = new TH1D("jetXtalTErr",  " xtal Time Error from jets", 200,   -1., 9.);
+   jetXtalTime  = new TH1D("jetXtalTime",  " xtal Time       from jets", 160, -4., 4.);
+
+   jet0Pt_T     = new TH2D("jet0Pt_T",  " leading jet Pt vs Time", 40,   0., 800., 80,  -4., 4.) ;
+   jet0Eta_T    = new TH2D("jet0Eta_T", " leading jet Eta vs Time", 41, -5.125, 5.125, 80,  -4., 4.) ;
+   jet_emF_T    = new TH2D("jet_emF_T", " jet emF vs Time from leading 2 jets", 46, -0.1, 2.2, 80,  -4., 4.) ;
+   jet_Pt_nXtal = new TH2D("jet_Pt_nXtal", "jet Pt vs N of xtals in a jet", 40, 0., 800., 251,  -0.5, 250.5) ;
+   xE_cE        = new TH2D("xE_cE",     " xtal E vs cluster E from a jet ", 40, 0., 800, 40,  0., 800.) ;
+   jet0Pt_ADC   = new TH2D("jet0Pt_ADC",  " leading jet Pt vs leading xtal ADC",  40,     0.,  800., 100,  300., 2300.) ;
+   jet0Eta_ADC  = new TH2D("jet0Eta_ADC", " leading jet Eta vs leading xtal ADC", 41, -5.125, 5.125, 100,  300., 2300.) ;
+
    c1 = new TCanvas("c1","", 800, 600);
    c2 = new TCanvas("c2","", 800, 600);
+   c3 = new TCanvas("c3","", 800, 600);
+   c4 = new TCanvas("c4","", 800, 600);
+
+   leg2 = new TLegend(.8, .4, .97, .55 );
+   leg3 = new TLegend(.15, .7, .35, .9 );
 
   }
 
@@ -60,111 +86,92 @@ class hJetTime : public hObj {
 
     delete nJets ;
     delete nPhotons ;
+    delete nElectrons ;
+    delete ele0Pt ;
+
     delete pho0Pt ;
     delete pho0T ;
+    delete pho0xT ;
+    delete pho0lT ;
+
     delete jet0Pt ;
-    delete jet1Pt ;
     delete jet0T ;
-    delete jet1T ;
-   
     delete jet0xT ;
+    delete jet0lT ;
+
+    delete jet1Pt ;
+    delete jet1T ;
     delete jet1xT ;
+    delete jet1lT ;
+
+    delete phoXtalTErr ;
+    delete phoXtalTime ;
+    delete jetXtalTErr ;
+    delete jetXtalTime ;
 
     delete jet0Pt_T ;    
+    delete jet0Eta_T ;    
+    delete jet_emF_T ;    
+    delete jet_Pt_nXtal ;    
+    delete xE_cE ;
+    delete jet0Pt_ADC ;    
+    delete jet0Eta_ADC ;    
 
     delete c1 ;
     delete c2 ;
+    delete c3 ;
+    delete c4 ;
+   
+    delete leg2;
+    delete leg3;
   }
 
-  void Draw( string hfolder, string plotType ) {
-
-      c1->SetFillColor(10);
-      c1->SetFillColor(10);
-      c1->Divide(2,2);
-
-      c1->cd(1);
-      nJets->Draw() ;
-      c1->Update();
-
-      c1->cd(2);
-      nPhotons->Draw() ;
-      c1->Update();
-
-      c1->cd(3);
-      jet0Pt->SetLineColor(2) ;
-      jet0Pt->Draw() ;
-      c1->Update();
-      jet1Pt->SetLineColor(4) ;
-      jet1Pt->Draw("same") ;
-      c1->Update();
-
-      c1->cd(4);
-      pho0Pt->Draw() ;
-      c1->Update();
-
-      TString plotname1 = hfolder + "event" + "."+plotType ;
-      c1->Print( plotname1 );
-
-      cout<<" draw 1 "<<endl;
-
-      gStyle->SetOptStat("erm");
-      c2->SetFillColor(10);
-      c2->SetFillColor(10);
-      c2->Divide(2,2);
-
-      c2->cd(1);
-      gStyle->SetStatY(0.9);
-      jet0T->Draw() ;
-      c2->Update();
-
-      gStyle->SetStatY(0.7);
-      jet0xT->SetLineColor(2) ;
-      jet0xT->Draw("same") ;
-      c2->Update();
-
-      c2->cd(2);
-      gStyle->SetStatY(0.9);
-      jet1T->Draw() ;
-      c2->Update();
-
-      gStyle->SetStatY(0.7);
-      jet1xT->SetLineColor(2) ;
-      jet1xT->Draw("same") ;
-      c2->Update();
-
-      c2->cd(3);
-      gStyle->SetStatY(0.9);
-      pho0T->Draw() ;
-      c2->Update();
-
-      c2->cd(4);
-      gStyle->SetPalette(1);
-      gStyle->SetNumberContours(5);
-      gStyle->SetStatX(0.85);
-      jet0Pt_T->Draw("COLZ") ;
-      c2->Update();
-
-      TString plotname2 = hfolder + "time" + "."+plotType ;
-      c2->Print( plotname2 );
-
-      cout<<" draw 2 "<<endl;
-  }
+  void Draw( string hfolder, string plotType );
 
   TH1D* nJets ;
   TH1D* nPhotons ;
+  TH1D* nElectrons ;
   TH1D* jet0Pt ;
   TH1D* jet1Pt ;
   TH1D* pho0Pt ;
+  TH1D* ele0Pt ;
+
+  TH1D* pho0T ;
   TH1D* jet0T ;
   TH1D* jet1T ;
+  TH1D* pho0xT ;
   TH1D* jet0xT ;
   TH1D* jet1xT ;
-  TH1D* pho0T ;
+  TH1D* pho0lT ;
+  TH1D* jet0lT ;
+  TH1D* jet1lT ;
+
+  TH1D* phoXtalTErr ;
+  TH1D* phoXtalTime ;
+  TH1D* jetXtalTErr ;
+  TH1D* jetXtalTime ;
 
   TH2D* jet0Pt_T ;
+  TH2D* jet0Eta_T ;
+  TH2D* jet_emF_T ;
+  TH2D* jet_Pt_nXtal ;
+  TH2D* xE_cE ;
+  TH2D* jet0Pt_ADC ;
+  TH2D* jet0Eta_ADC ;
 
   TCanvas* c1 ;
   TCanvas* c2 ;
+  TCanvas* c3 ;
+  TCanvas* c4 ;
+
+  TLegend* leg2 ;
+  TLegend* leg3 ;
+
+  TString plotname1 ;
+  TString plotname2 ;
+  TString plotname3 ;
+  TString plotname4 ;
+
   //ClassDef(hJetTime, 1);
   private:
 

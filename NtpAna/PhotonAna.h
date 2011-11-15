@@ -27,6 +27,7 @@
 
 #include "AnaInput.h"
 #include "Histograms.h"
+#include "MathFunctions.h"
 
 #define MAXSC 51
 #define MAXC 201
@@ -52,6 +53,13 @@ public:
    void test();
    void ReadTree();
 
+   
+   vector<double> BinningFit( TH2D* h2, string hName, int xbinMin, int xbinMax, bool debugPlots = false );
+   void BinningFitScan( TH2D* h2, vector<double>& xV, vector<double>& yV, vector<double>& yErrV, bool debugPlots = false,  int rbin = 1, int startBin = 1, int finalBin = -1) ;
+
+   void ScalarPlotter( TH2D* h2, TString hname, double yMin, double yMax, int rbin = 1, bool debugPlots = false );
+   void ScalarPlotList() ;
+
 private:
 
    AnaInput*       Input;
@@ -59,9 +67,14 @@ private:
    string hfolder ;
    string plotType ;
    int ProcessEvents ;
-    
-   //ClassDef(PhotonAna, 1);
 
+   hJetTime hJets ;
+   string debugStr ;
+   vector<double> photonCuts ;
+   //bool debug ;
+
+
+   //ClassDef(PhotonAna, 1);
 };
 
 //#if !defined(__CINT__)

@@ -23,7 +23,6 @@ public:
    ~MathFunctions();     
  
    static Double_t fitPoly(Double_t *x, Double_t *par); 
-   static Double_t fitG( Double_t* x, Double_t* par);
    static Double_t fitLG( Double_t* x, Double_t* par);
    static Double_t fitGS( Double_t* x, Double_t* par);
    static Double_t fitLD( Double_t* x, Double_t* par);

@@ -17,11 +17,11 @@ Double_t MathFunctions::fitPoly(Double_t *x, Double_t *par) {
          return fitval;
 }
 
-Double_t MathFunctions::fitG( Double_t* x, Double_t* par){
+// Gaussian distribution , p0: Amplitude, p1: mean, p2: sigma
+Double_t MathFunctions::fitGS(Double_t *x, Double_t *par) {
 
      Double_t gs_Value = TMath::Gaus(x[0],par[1],par[2]) ;
-     Double_t fitV = par[0]*gs_Value*exp( 0.1*x[0] ) ; 
-
+     Double_t fitV = par[0]*gs_Value ; 
      return fitV;
 }
 
@@ -48,6 +48,7 @@ Double_t MathFunctions::fitParabola( Double_t *x, Double_t *par ){
      return fV;
 }
 
+
 Double_t MathFunctions::fitBW(Double_t *x, Double_t *par) {
 
      Double_t gm = par[0] + 0.001;
@@ -55,13 +56,6 @@ Double_t MathFunctions::fitBW(Double_t *x, Double_t *par) {
      Double_t C1 = 1. + (chi*chi) ;
      Double_t fV = par[2]/C1 ;
      return fV;
-}
-
-Double_t MathFunctions::fitGS(Double_t *x, Double_t *par) {
-
-     Double_t gs_Value = TMath::Gaus(x[0],par[1],par[2]) ;
-     Double_t fitV = par[0]*gs_Value ; 
-     return fitV;
 }
 
 Double_t MathFunctions::fitSG(Double_t *x, Double_t *par) {

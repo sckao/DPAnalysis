@@ -60,17 +60,26 @@ class hJetTime : public hObj {
    jet1lT   = new TH1D("jet1lT",   " 2nd jet Time spectrum from leading xtals", 160, -4., 4.);
 
    phoXtalTErr  = new TH1D("phoXtalTErr",  " xtal Time Error from photon", 200,   -1., 9.);
-   phoXtalTime  = new TH1D("phoXtalTime",  " xtal Time       from photon", 160, -4., 4.);
+   phoXtalTime  = new TH1D("phoXtalTime",  " xtal Time       from photon", 80, -4., 4.);
    jetXtalTErr  = new TH1D("jetXtalTErr",  " xtal Time Error from jets", 200,   -1., 9.);
-   jetXtalTime  = new TH1D("jetXtalTime",  " xtal Time       from jets", 160, -4., 4.);
+   jetXtalTime  = new TH1D("jetXtalTime",  " xtal Time       from jets", 80, -4., 4.);
+   dT_JetPho    = new TH1D("dT_JetPho",    " T_pho - T_jet", 80, -4., 4. );
+
+   jetXtalPos   = new TH2D("jetXtalPos",   " xtal Position   from jets", 125, -3.125, 3.125, 126, -3.15, 3.15 );
 
    jet0Pt_T     = new TH2D("jet0Pt_T",  " leading jet Pt vs Time", 40,   0., 800., 80,  -4., 4.) ;
    jet0Eta_T    = new TH2D("jet0Eta_T", " leading jet Eta vs Time", 41, -5.125, 5.125, 80,  -4., 4.) ;
    jet_emF_T    = new TH2D("jet_emF_T", " jet emF vs Time from leading 2 jets", 46, -0.1, 2.2, 80,  -4., 4.) ;
-   jet_Pt_nXtal = new TH2D("jet_Pt_nXtal", "jet Pt vs N of xtals in a jet", 40, 0., 800., 251,  -0.5, 250.5) ;
+   jet_Pt_nXtal = new TH2D("jet_Pt_nXtal", "jet Pt vs N of xtals in a jet", 40, 0., 800., 51,  -0.5, 50.5) ;
    xE_cE        = new TH2D("xE_cE",     " xtal E vs cluster E from a jet ", 40, 0., 800, 40,  0., 800.) ;
-   jet0Pt_ADC   = new TH2D("jet0Pt_ADC",  " leading jet Pt vs leading xtal ADC",  40,     0.,  800., 100,  300., 2300.) ;
-   jet0Eta_ADC  = new TH2D("jet0Eta_ADC", " leading jet Eta vs leading xtal ADC", 41, -5.125, 5.125, 100,  300., 2300.) ;
+   jet0Pt_ADC   = new TH2D("jet0Pt_ADC",  " leading jet Pt vs xtal ADC sum",  40,     0.,  800.,  50,  300., 6300.) ;
+   jet0Eta_ADC  = new TH2D("jet0Eta_ADC", " leading jet Eta vs xtal ADC sum", 41, -5.125, 5.125,  50,  300., 6300.) ;
+   jet0T_ADC    = new TH2D("jet0T_ADC", "xtal ADC sum vs leading jet xtal Time", 50,  300., 6300., 80, -4, 4. ) ;
+   j0_xtalEBT_ADC = new TH2D("j0_xtalEBT_ADC", "EB xtal ADC vs xtal Time from leading jet", 100,  0., 2500., 80, -4, 4. ) ;
+   j0_xtalEET_ADC = new TH2D("j0_xtalEET_ADC", "EE xtal ADC vs xtal Time from leading jet", 100,  0., 2500., 80, -4, 4. ) ;
+
+   jPt_dR_gj    = new TH2D("jPt_dR_gj", " jet Pt vs min_dR( photon, jets )", 40, 0., 800., 51, -0.05, 5.05);
+   ePt_dR_ge    = new TH2D("ePt_dR_ge", " electron Pt vs min_dR( photon, electrons )", 40, 0., 800., 51, -0.05, 5.05);
 
    c1 = new TCanvas("c1","", 800, 600);
    c2 = new TCanvas("c2","", 800, 600);
@@ -108,7 +117,9 @@ class hJetTime : public hObj {
     delete phoXtalTime ;
     delete jetXtalTErr ;
     delete jetXtalTime ;
+    delete dT_JetPho ;
 
+    delete jetXtalPos ;
     delete jet0Pt_T ;    
     delete jet0Eta_T ;    
     delete jet_emF_T ;    
@@ -116,6 +127,12 @@ class hJetTime : public hObj {
     delete xE_cE ;
     delete jet0Pt_ADC ;    
     delete jet0Eta_ADC ;    
+    delete jet0T_ADC ;    
+    delete j0_xtalEBT_ADC ;    
+    delete j0_xtalEET_ADC ;    
+
+    delete jPt_dR_gj ;
+    delete ePt_dR_ge ;
 
     delete c1 ;
     delete c2 ;
@@ -150,7 +167,9 @@ class hJetTime : public hObj {
   TH1D* phoXtalTime ;
   TH1D* jetXtalTErr ;
   TH1D* jetXtalTime ;
+  TH1D* dT_JetPho ;
 
+  TH2D* jetXtalPos ;
   TH2D* jet0Pt_T ;
   TH2D* jet0Eta_T ;
   TH2D* jet_emF_T ;
@@ -158,6 +177,12 @@ class hJetTime : public hObj {
   TH2D* xE_cE ;
   TH2D* jet0Pt_ADC ;
   TH2D* jet0Eta_ADC ;
+  TH2D* jet0T_ADC ;
+  TH2D* j0_xtalEBT_ADC ;
+  TH2D* j0_xtalEET_ADC ;
+
+  TH2D* jPt_dR_gj ;
+  TH2D* ePt_dR_ge ;
 
   TCanvas* c1 ;
   TCanvas* c2 ;

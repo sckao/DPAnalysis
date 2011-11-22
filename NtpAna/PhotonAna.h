@@ -29,19 +29,11 @@
 #include "Histograms.h"
 #include "MathFunctions.h"
 
-#define MAXSC 51
-#define MAXC 201
-#define MAXXTALINC 26 
+#define MAXSC 50
+#define MAXC 200
+#define MAXXTALINC 25 
+#define MAXOBJ 10
 #define MAXVTX 40
-#define MAXHCALRECHITS 100
-#define MAXCALOTOWERS 100
-#define MAXMU 20
-#define MAXTOWERSINTPGSUMMARY 100
-#define MAXL1OBJS 100
-#define MAXJET 10
-#define MAXELE 10
-#define MAXPHO 10
-#define MAXOBJ 50
 
 class PhotonAna : public TObject {
 
@@ -60,6 +52,8 @@ public:
    void ScalarPlotter( TH2D* h2, TString hname, double yMin, double yMax, int rbin = 1, bool debugPlots = false );
    void ScalarPlotList() ;
 
+   double DeltaR( float eta1, float phi1, float eta2, float phi2 ) ;
+
 private:
 
    AnaInput*       Input;
@@ -70,8 +64,15 @@ private:
 
    hJetTime hJets ;
    string debugStr ;
+
+   vector<TLorentzVector> jetV ;
+   vector<TLorentzVector> eleV ;
+
    vector<double> photonCuts ;
-   //bool debug ;
+   vector<double> electronCuts ;
+   vector<double> jetCuts ;
+   vector<double> BasicClusterCuts ;
+   vector<double> XtalCuts ;
 
 
    //ClassDef(PhotonAna, 1);

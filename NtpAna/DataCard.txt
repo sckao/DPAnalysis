@@ -49,13 +49,18 @@ TheData = ( data+ )
 
 ProcessEvents = -1
 
-Debug = False
-# Luminostiy( pb^-1 )
-Lumi = 1000
 
-#Cuts         Pt, Eta, METcut, MaxNJets, JER_sig
-JetCuts = (  20., 2.4,    -1,       6,       3 )
-#Cuts          Pt,  Eta,  Iso, dRgj, nPhotn 
-PhotonCuts = ( 70.,  2.4,  0.15, 0.3,  1 )
+# Jet/MET     Pt,  Eta,    NJets, MET
+JetCuts = (  30.,  2.4,        3,  -1  )
+# Photon Cuts   Pt,  Eta,   Iso, dRgj, nPhotn 
+PhotonCuts = ( 70.,  2.4,  0.15,  0.3,    1 )
+# electron      Pt  Eta  relIso  dR
+ElectronCuts =( 25, 2.4,  0.15, 0.3 )
 
+# basic cluster selection
+#  BasicCluster      E   T    dRcj
+BasicClusterCuts = ( 5., 10., 0.5 )
+# crystal selection
+#  xtal       E   TErrMax, chi2, dRxj
+XtalCuts = (  5.,     10,    99, 0.5 )
 

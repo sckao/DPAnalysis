@@ -187,6 +187,12 @@ void hJetTime::Draw( string hfolder, string plotType ) {
       plotname3 = hfolder + "jetXtalTime" + "."+plotType ;
       c3->Print( plotname3 );
 
+      c3->cd();
+      dT_JetPho->Draw() ;
+      c3->Update();
+      plotname3 = hfolder + "dT_JetPho" + "."+plotType ;
+      c3->Print( plotname3 );
+
       // plot 4 , 2D: jet0 Pt vs BC_Time
       gStyle->SetOptStat("eroum");
       c4->SetFillColor(10);
@@ -250,9 +256,64 @@ void hJetTime::Draw( string hfolder, string plotType ) {
       gStyle->SetPalette(1);
       gStyle->SetNumberContours(5);
       gStyle->SetStatX(0.9);
+      jet0T_ADC->Draw("COLZ") ;
+      c4->Update();
+      plotname4 = hfolder + "jet0T_ADC" + "."+plotType ;
+      c4->Print( plotname4 );
+
+      c4->cd();
+      gStyle->SetPalette(1);
+      gStyle->SetNumberContours(5);
+      gStyle->SetStatX(0.9);
+      j0_xtalEBT_ADC->Draw("COLZ") ;
+      c4->Update();
+      plotname4 = hfolder + "jet0_xtalEBT_ADC" + "."+plotType ;
+      c4->Print( plotname4 );
+
+      c4->cd();
+      gStyle->SetPalette(1);
+      gStyle->SetNumberContours(5);
+      gStyle->SetStatX(0.9);
+      j0_xtalEET_ADC->Draw("COLZ") ;
+      c4->Update();
+      plotname4 = hfolder + "jet0_xtalEET_ADC" + "."+plotType ;
+      c4->Print( plotname4 );
+
+      c4->cd();
+      gStyle->SetPalette(1);
+      gStyle->SetNumberContours(5);
+      gStyle->SetStatX(0.9);
       xE_cE->Draw("COLZ") ;
       c4->Update();
       plotname4 = hfolder + "xtalE_bcE" + "."+plotType ;
       c4->Print( plotname4 );
 
+      c4->cd();
+      c4->SetLogz(1); // set log z-axis
+      gStyle->SetPalette(1);
+      gStyle->SetNumberContours(10);
+      gStyle->SetStatX(0.9);
+      jetXtalPos->Draw("COLZ") ;
+      c4->Update();
+      plotname4 = hfolder + "xtal_eta_phi" + "."+plotType ;
+      c4->Print( plotname4 );
+      c4->SetLogz(0); // set linear y-axis
+
+      c4->cd();
+      gStyle->SetPalette(1);
+      gStyle->SetNumberContours(5);
+      gStyle->SetStatX(0.9);
+      jPt_dR_gj->Draw("COLZ") ;
+      c4->Update();
+      plotname4 = hfolder + "jPt_dR_gj" + "."+plotType ;
+      c4->Print( plotname4 );
+
+      c4->cd();
+      gStyle->SetPalette(1);
+      gStyle->SetNumberContours(5);
+      gStyle->SetStatX(0.9);
+      ePt_dR_ge->Draw("COLZ") ;
+      c4->Update();
+      plotname4 = hfolder + "ePt_dR_ge" + "."+plotType ;
+      c4->Print( plotname4 );
 }

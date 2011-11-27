@@ -53,14 +53,14 @@ ProcessEvents = -1
 # Jet/MET     Pt,  Eta,    NJets, MET
 JetCuts = (  30.,  2.4,        3,  -1  )
 # Photon Cuts   Pt,  Eta,   Iso, dRgj, nPhotn 
-PhotonCuts = ( 70.,  2.4,  0.15,  0.3,    1 )
+PhotonCuts = ( 70.,  2.4,  0.15,  0.5,    1 )
 # electron      Pt  Eta  relIso  dR
 ElectronCuts =( 25, 2.4,  0.15, 0.3 )
 
 # basic cluster selection
 #  BasicCluster      E   T    dRcj
-BasicClusterCuts = ( 5., 10., 0.5 )
+BasicClusterCuts = ( 10., 21., 0.5 )
 # crystal selection
-#  xtal       E   TErrMax, chi2, dRxj
-XtalCuts = (  5.,     10,    99, 0.5 )
+#  xtal       E   TErrMax, EBchi2, EEchi2, dRxj
+XtalCuts = (  10.,     1.4,    45,     50, 0.9 )
 

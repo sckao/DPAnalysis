@@ -1,8 +1,8 @@
 #include "PhotonAna.h"
 
-PhotonAna::PhotonAna(){
+PhotonAna::PhotonAna( string datacardfile ){
 
-  Input = new AnaInput();
+  Input = new AnaInput( datacardfile );
   
   Input->GetParameters("PlotType",      &plotType ) ; 
   Input->GetParameters("Path",          &hfolder ) ; 
@@ -12,10 +12,17 @@ PhotonAna::PhotonAna(){
   Input->GetParameters( "ElectronCuts", &electronCuts );
   Input->GetParameters( "JetCuts",      &jetCuts );
 
+  Input->GetParameters( "SelectBackground",  &selectBackground );
+  Input->GetParameters( "SplitEvent",        &split );
+
   Input->GetParameters( "BasicClusterCuts",  &BasicClusterCuts );
-  Input->GetParameters( "XtalCuts",           &XtalCuts );
+  Input->GetParameters( "XtalCuts",          &XtalCuts );
+  Input->GetParameters( "DoTimeCorrection",  &doTimeCorrection );
   //Input->GetParameters("Debug", &debugStr ) ; 
   //if ( debugStr == "True" ) debug = true ;
+  theTimeCorrector_.initEB("EB");
+  theTimeCorrector_.initEE("EE");
+
 }
 
 PhotonAna::~PhotonAna(){
@@ -26,14 +33,6 @@ PhotonAna::~PhotonAna(){
 }
 
 // analysis template
-void PhotonAna::test() { 
-
-  double lumi = 0 ;
-  Input->GetParameters( "Lumi", &lumi ) ;
-  cout <<" lumi = "<< lumi <<endl;
-
-}
- 
 void PhotonAna::ReadTree() { 
 
    //vector<string> rFiles ;
@@ -103,15 +102,14 @@ void PhotonAna::ReadTree() {
    for ( int i=0; i< tr->GetEntries(); i++ ) {
        if ( ProcessEvents > 0 && i > ( ProcessEvents - 1 ) ) break;
        tr->GetEntry( i );
-     
-       //cout<<" Event "<< eventId <<endl ;
-       hJets.nJets->Fill( nJets );
-       hJets.nPhotons->Fill( nPhotons );
-       hJets.nElectrons->Fill( nElectrons );
 
+       if ( i%2 == split ) continue ;    
+ 
+       //cout<<" Event "<< eventId <<endl ;
        // 1. met selection
        TLorentzVector metp4( metPx, metPy, 0., metE ) ;
-       if ( metp4.Et()  <  jetCuts[3] ) continue ;
+       if ( jetCuts[4] > 0 &&  metp4.Et() < jetCuts[4] ) continue ;
+       if ( jetCuts[4] < 0 &&  metp4.Et() > fabs( jetCuts[4] ) ) continue ;
 
        // 2. jet selection
        int nu_Jets = 0 ;
@@ -122,10 +120,11 @@ void PhotonAna::ReadTree() {
            nu_Jets++ ;
            jetV.push_back( jp4 );
        }
-       if ( nu_Jets < jetCuts[2] ) continue ;
+       if ( nu_Jets < jetCuts[2] || nu_Jets > jetCuts[3] ) continue ;
 
        // 2. get the leading electron info, just check
        eleV.clear() ;
+       eIdV.clear() ;
        for ( int i=0 ; i< nElectrons; i++ ) {
            TLorentzVector eP4( elePx[i], elePy[i], elePz[i], eleE[i] ) ;
            if ( eP4.Pt() < electronCuts[0] || fabs( eP4.Eta()) > electronCuts[1] ) continue ;
@@ -139,14 +138,19 @@ void PhotonAna::ReadTree() {
            if ( dR < electronCuts[3] ) continue ;
            hJets.ele0Pt->Fill( eP4.Pt() );
            eleV.push_back( eP4.Pt() ) ;
+           eIdV.push_back( 11.1 + (0.1*i) );
        }
 
        // 3. photon cuts
        int nu_Photons = 0 ;
        int gid = -1 ;
+       double maxPhotonPt = photonCuts[0] ;
        for ( int i=0 ; i< nPhotons; i++ ) {
+           bool SignalLike = false ;
            TLorentzVector phoP4( phoPx[i], phoPy[i], phoPz[i], phoE[i] ) ;
            if ( phoP4.Pt() < photonCuts[0] || fabs(phoP4.Eta()) > photonCuts[1] ) continue ;
+           if ( phoP4.Pt() > 100. ) SignalLike = true ;
+           if ( SignalLike && selectBackground == 1 ) continue ;
            // check the isolation -- using dR_gj
            double dR_gj = 999. ;
            double jpt = 0 ;
@@ -173,17 +177,21 @@ void PhotonAna::ReadTree() {
            hJets.jPt_dR_gj->Fill( jpt, dR_gj ) ;
            hJets.ePt_dR_ge->Fill( ept, dR_ge ) ;
 
-           gid = ( phoP4.Pt() > photonCuts[0] ) ? i : gid ;
+           gid = ( phoP4.Pt() > maxPhotonPt ) ? i : gid ;
            nu_Photons++ ;
        }
        if ( nu_Photons < photonCuts[4] || gid < 0 ) continue ;
        //cout<<" EventID : "<< eventId ;
        //cout<<" Jet size = "<< jetV.size() <<" Photon ID = "<< gid <<endl;
 
+       // event profile
        TLorentzVector gp4( phoPx[gid], phoPy[gid], phoPz[gid], phoE[gid] ) ;
        hJets.pho0Pt->Fill( gp4.Pt() );
        hJets.pho0Eta->Fill( gp4.Eta() );
        hJets.hMET->Fill( metE );
+       hJets.nJets->Fill( nu_Jets );
+       hJets.nPhotons->Fill( nu_Photons );
+       hJets.nElectrons->Fill( eleV.size() );
 
        //** Photon Time info
        float gleadEnergy = 0 ;
@@ -205,12 +213,16 @@ void PhotonAna::ReadTree() {
 	   float seedTErr   =  999999 ;
            for (int y=0; y< nXtalInBC[x]; y++) {
 
-	       hJets.phoXtalTime->Fill( xtalInBCTime[x][y] ); 
+               double xtalTime  =  xtalInBCTime[x][y] 
+                         + (xtalInBCTime[x][y]*theTimeCorrector_.getCorrection( (float) xtalInBCEnergy[x][y], xtalInBCEta[x][y]) );
+               if ( doTimeCorrection == 0 )  xtalTime = xtalInBCTime[x][y] ;
+
+	       hJets.phoXtalTime->Fill( xtalTime); 
 	       hJets.phoXtalTErr->Fill( xtalInBCTimeErr[x][y] ); 
-               if ( fabs(xtalInBCEta[x][y])  < 1.479 ) hJets.xtalEB_Chi2_T->Fill( xtalChi2[x][y], xtalInBCTime[x][y]);
-               if ( fabs(xtalInBCEta[x][y]) >= 1.479 ) hJets.xtalEE_Chi2_T->Fill( xtalChi2[x][y], xtalInBCTime[x][y]);
+               if ( fabs(xtalInBCEta[x][y])  < 1.479 ) hJets.xtalEB_Chi2_T->Fill( xtalChi2[x][y], xtalTime );
+               if ( fabs(xtalInBCEta[x][y]) >= 1.479 ) hJets.xtalEE_Chi2_T->Fill( xtalChi2[x][y], xtalTime );
                hJets.xtal_Chi2_E->Fill( xtalChi2[x][y], xtalInBCEnergy[x][y]);
-               hJets.xtal_T_E->Fill( xtalInBCTime[x][y], xtalInBCEnergy[x][y]);
+               hJets.xtal_T_E->Fill( xtalTime, xtalInBCEnergy[x][y]);
 
 	       if ( xtalInBCEnergy[x][y] < XtalCuts[0] ) continue ;
 	       if ( xtalInBCTimeErr[x][y] < 0.2 || xtalInBCTimeErr[x][y] > XtalCuts[1] ) continue ;
@@ -219,23 +231,23 @@ void PhotonAna::ReadTree() {
 
 	       if ( xtalInBCEnergy[x][y] > gleadEnergy ) {                         
                   gleadEnergy = xtalInBCEnergy[x][y] ;
-                  gleadTime   = xtalInBCTime[x][y] ;
+                  gleadTime   = xtalTime ;
                   gleadEta    = fabs( xtalInBCEta[x][y] );
                }
                if ( xtalInBCEnergy[x][y] > seedEnergy ) {
                   seedEnergy = xtalInBCEnergy[x][y] ; 
-                  seedTime   = xtalInBCTime[x][y] ;
+                  seedTime   = xtalTime ;
                   seedTErr   = xtalInBCTimeErr[x][y] ;
                }
                hJets.g0_xtalEta_ADC->Fill( xtalInBCEta[x][y], xtalADC[x][y] );
-	       if ( fabs(xtalInBCEta[x][y])  < 1.479 ) hJets.g0_xtalEB_ADC_T->Fill( xtalADC[x][y], xtalInBCTime[x][y] );
+	       if ( fabs(xtalInBCEta[x][y])  < 1.479 ) hJets.g0_xtalEB_ADC_T->Fill( xtalADC[x][y], xtalTime );
 	       if ( fabs(xtalInBCEta[x][y])  < 1.479 ) hJets.g0_xtalEB_ADC_E->Fill( xtalADC[x][y], xtalInBCEnergy[x][y] );
            }
            if ( seedEnergy != -999999 ) {
               gTime +=  seedTime / pow( seedTErr, 2) ;
               ngC   +=        1. / pow( seedTErr, 2) ;
            }
-       }
+       } // end of photon loop
        if ( ngC > 0. ) {
           gTime  = gTime  / ngC ;
 	  if ( gp4.Eta()  < 1.479 ) hJets.pho0xTB->Fill( gTime ); 
@@ -263,7 +275,7 @@ void PhotonAna::ReadTree() {
 	   float jleadTime   = 0 ;
            float jleadEta    = 999 ;
 	   float jxTime  = 0 ;
-	   int   nXtal  = 0 ; 
+	   int   nXtal   = 0 ; 
 	   float nC  = 0 ;
 	   for (int x =0; x< nClusters; x++) {
 
@@ -282,18 +294,21 @@ void PhotonAna::ReadTree() {
 	       float seedTErr   =  999999 ;
 	       for (int y=0; y< nXtalInBC[x]; y++) {
 
-                   if ( fabs(xtalInBCEta[x][y])  < 1.479 ) hJets.xtalEB_Chi2_T->Fill( xtalChi2[x][y], xtalInBCTime[x][y]);
-                   if ( fabs(xtalInBCEta[x][y]) >= 1.479 ) hJets.xtalEE_Chi2_T->Fill( xtalChi2[x][y], xtalInBCTime[x][y]);
-                   hJets.xtal_Chi2_E->Fill( xtalChi2[x][y], xtalInBCEnergy[x][y]);
-                   hJets.xtal_T_E->Fill( xtalInBCTime[x][y], xtalInBCEnergy[x][y]);
+                   double xtalTime  =  xtalInBCTime[x][y] 
+                       + (xtalInBCTime[x][y]*theTimeCorrector_.getCorrection( (float) xtalInBCEnergy[x][y], xtalInBCEta[x][y]) );
+                   if ( doTimeCorrection == 0 )  xtalTime = xtalInBCTime[x][y] ;
 
-		   if ( j == 0 ) hJets.jetXtalTime->Fill( xtalInBCTime[x][y] ); 
+                   if ( fabs(xtalInBCEta[x][y])  < 1.479 ) hJets.xtalEB_Chi2_T->Fill( xtalChi2[x][y], xtalTime );
+                   if ( fabs(xtalInBCEta[x][y]) >= 1.479 ) hJets.xtalEE_Chi2_T->Fill( xtalChi2[x][y], xtalTime );
+                   hJets.xtal_Chi2_E->Fill( xtalChi2[x][y], xtalInBCEnergy[x][y]);
+                   hJets.xtal_T_E->Fill( xtalTime, xtalInBCEnergy[x][y]);
+
+		   if ( j == 0 ) hJets.jetXtalTime->Fill( xtalTime ); 
 		   if ( j == 0 ) hJets.jetXtalTErr->Fill( xtalInBCTimeErr[x][y] ); 
 		   if ( j == 0 ) hJets.jetXtalPos->Fill( xtalInBCEta[x][y], xtalInBCPhi[x][y] );
 
                    if ( xtalInBCEnergy[x][y] < XtalCuts[0] ) continue ;
 		   if ( xtalInBCTimeErr[x][y] < 0.2 || xtalInBCTimeErr[x][y] > XtalCuts[1] ) continue ;
-		   if ( xtalChi2[x][y] > XtalCuts[2] ) continue ;
                    if ( fabs(xtalInBCEta[x][y])  < 1.479 && xtalChi2[x][y] > XtalCuts[2] ) continue ;
                    if ( fabs(xtalInBCEta[x][y]) >= 1.479 && xtalChi2[x][y] > XtalCuts[3] ) continue ;
 		   double dRxj = DeltaR( xtalInBCEta[x][y], xtalInBCPhi[x][y] , jetV[j].Eta(), jetV[j].Phi()  ) ;
@@ -303,20 +318,20 @@ void PhotonAna::ReadTree() {
 
 		   if ( xtalInBCEnergy[x][y] > jleadEnergy ) {                         
 		      jleadEnergy = xtalInBCEnergy[x][y] ;
-		      jleadTime   = xtalInBCTime[x][y] ;
+		      jleadTime   = xtalTime ;
                       jleadEta    = xtalInBCEta[x][y] ;
                    }
 		   if ( xtalInBCEnergy[x][y] > seedEnergy ) {                         
-                      seedEnergy = xtalInBCEnergy[x][y] ;
-		      seedTime   = xtalInBCTime[x][y] ;
+                      seedEnergy= xtalInBCEnergy[x][y] ;
+                      seedTime  =   xtalTime ;
 		      seedTErr   = xtalInBCTimeErr[x][y] ;
                    }
 		   //double sinTheta   = fabs( sin( 2. *atan( exp(-1*xtalInBCEta[x][y]  ) ) ) );
 		   nXtal++ ;
                    hJets.j0_xtalEta_ADC->Fill( xtalInBCEta[x][y], xtalADC[x][y] );
-		   if ( j == 0 && fabs(xtalInBCEta[x][y])  < 1.479 ) hJets.j0_xtalEB_ADC_T->Fill( xtalADC[x][y], xtalInBCTime[x][y] );
+		   if ( j == 0 && fabs(xtalInBCEta[x][y])  < 1.479 ) hJets.j0_xtalEB_ADC_T->Fill( xtalADC[x][y], xtalTime );
                    if ( j == 0 && fabs(xtalInBCEta[x][y])  < 1.479 ) hJets.j0_xtalEB_ADC_E->Fill( xtalADC[x][y], xtalInBCEnergy[x][y] );
-                   if ( j == 0 && fabs(xtalInBCEta[x][y]) >= 1.479 ) hJets.j0_xtalEE_ADC_T->Fill( xtalADC[x][y], xtalInBCTime[x][y] );
+                   if ( j == 0 && fabs(xtalInBCEta[x][y]) >= 1.479 ) hJets.j0_xtalEE_ADC_T->Fill( xtalADC[x][y], xtalTime );
                    if ( j == 0 && fabs(xtalInBCEta[x][y]) >= 1.479 ) hJets.j0_xtalEE_ADC_E->Fill( xtalADC[x][y], xtalInBCEnergy[x][y] );
                }
                if ( seedEnergy != -999999 ) {
@@ -346,11 +361,55 @@ void PhotonAna::ReadTree() {
               }
               if ( k == 1 ) jTime = jxTime ;
 	   } 
-       }
+       } // end of jet loop
        if ( k > 0 && ngC > 0. ) hJets.dT_JetPho->Fill( gleadTime - jTime ) ;  
        
+       //** 3. get the associated bc for electron - a cross check 
+       for ( int j=0 ; j< (int)(eleV.size()); j++) {
+           TLorentzVector ep4( eleV[j].Px(), eleV[j].Py(), eleV[j].Pz(), eleV[j].E() ) ;
 
-   }
+           // loop the clusters
+	   float eleadEnergy = 0 ;
+	   float eleadTime   = 0 ;
+           float eleadEta    = 999 ;
+	   int   nXtal       = 0 ; 
+	   for (int x =0; x< nClusters; x++) {
+
+	       if ( CPIdx[x] < 11. || CPIdx[x] > 12. ) continue ;
+
+	       //float jidx =  11. + (j+1.)*0.1 ;
+	       if ( clusterEnergy[x] < BasicClusterCuts[0] ) continue;
+	       if ( CPIdx[x] != eIdV[j]  || fabs(clusterTime[x]) > BasicClusterCuts[1] ) continue ;
+	       //cout<<" BC"<<x<<" CPIdx = "<< CPIdx[x]  <<endl ;
+
+	       for (int y=0; y< nXtalInBC[x]; y++) {
+
+                   double xtalTime  =  xtalInBCTime[x][y] 
+                       + (xtalInBCTime[x][y]*theTimeCorrector_.getCorrection( (float) xtalInBCEnergy[x][y], xtalInBCEta[x][y]) );
+                   if ( doTimeCorrection == 0 )  xtalTime = xtalInBCTime[x][y] ;
+
+                   if ( xtalInBCEnergy[x][y] < XtalCuts[0] ) continue ;
+		   if ( xtalInBCTimeErr[x][y] < 0.2 || xtalInBCTimeErr[x][y] > XtalCuts[1] ) continue ;
+                   if ( fabs(xtalInBCEta[x][y])  < 1.479 && xtalChi2[x][y] > XtalCuts[2] ) continue ;
+                   if ( fabs(xtalInBCEta[x][y]) >= 1.479 && xtalChi2[x][y] > XtalCuts[3] ) continue ;
+		   //double dRxj = DeltaR( xtalInBCEta[x][y], xtalInBCPhi[x][y] , eleV[j].Eta(), eleV[j].Phi()  ) ;
+		   //if ( dRxj > XtalCuts[4] ) continue ;
+                   nXtal++ ;
+		   if ( xtalInBCEnergy[x][y] > eleadEnergy ) {                         
+		      eleadEnergy = xtalInBCEnergy[x][y] ;
+		      eleadTime   = xtalTime ;
+                      eleadEta    = xtalInBCEta[x][y] ;
+                   }
+               }
+           }
+	   if ( nXtal > 0 ) { 
+	       if ( eleadEta   < 1.479 ) hJets.elelTB->Fill( eleadTime ); 
+	       if ( eleadEta  >= 1.479 ) hJets.elelTE->Fill( eleadTime ); 
+	   } 
+           //if ( nXtal == 0 ) cout<<" sucks! bad electron :"<< ep4.Pt() <<endl ;
+       } // end of electron loop
+
+   } // end of event looping
 
    hJets.Draw( hfolder, plotType ) ;
    hJets.FitNDraw( hfolder, plotType ) ;
@@ -359,20 +418,22 @@ void PhotonAna::ReadTree() {
 void PhotonAna::ScalarPlotList() {
 
    bool debugPlots = false ;
-   ScalarPlotter( hJets.j0_xtalEB_ADC_T, "g0_xtalEB_ADC_T", -2., 2., 5, debugPlots ) ;
-   ScalarPlotter( hJets.j0_xtalEB_ADC_T, "j0_xtalEB_ADC_T", -2., 2., 5 ) ;
-   ScalarPlotter( hJets.j0_xtalEE_ADC_T, "j0_xtalEE_ADC_T", -2., 2., 5 ) ;
-   ScalarPlotter( hJets.j0_xtalEta_ADC,  "j0_xtalEta_ADC",   0., 1000., 1 ) ;
-   ScalarPlotter( hJets.jet0Eta_T,    "jet_Eta_Time",  -2,   2 ) ;
-   ScalarPlotter( hJets.jet0Pt_T,     "jet_Pt_Time",   -2,   2 ) ;
+   ScalarPlotter( hJets.g0_xtalEB_ADC_T, "g0_xtalEB_ADC_T", -1., 1., 5, 1, debugPlots ) ;
+   ScalarPlotter( hJets.j0_xtalEB_ADC_T, "j0_xtalEB_ADC_T", -1., 1., 5, 1 ) ;
+   ScalarPlotter( hJets.j0_xtalEE_ADC_T, "j0_xtalEE_ADC_T", -1., 1., 5, 1 ) ;
+   ScalarPlotter( hJets.j0_xtalEta_ADC,  "j0_xtalEta_ADC",   0., 1000., 1  ) ;
+   ScalarPlotter( hJets.jet0Eta_T,    "jet_Eta_Time",  -1,   1 ) ;
+   ScalarPlotter( hJets.jet0Pt_T,     "jet_Pt_Time",   -1,   1, 1, 1 ) ;
 
 }
 
-void PhotonAna::ScalarPlotter( TH2D* h2, TString hname, double yMin, double yMax, int rbin, bool debugPlots ) {
+void PhotonAna::ScalarPlotter( TH2D* h2, TString hname, double yMin, double yMax, int rbin, int drawOpt, bool debugPlots  ) {
 
     TCanvas* c1 = new TCanvas("c1","", 800, 600);
     c1->SetFillColor(10);
     c1->SetFillColor(10);
+    if ( drawOpt == 1) c1->SetLogx();
+    if ( drawOpt == 2) c1->SetLogy();
     gPad->SetGridx();
     gPad->SetGridy();
 
@@ -398,7 +459,8 @@ void PhotonAna::ScalarPlotter( TH2D* h2, TString hname, double yMin, double yMax
     gStyle->SetOptStat(kTRUE);
     gStyle->SetOptFit(111);
 
-    TGraphErrors* g1 = new TGraphErrors( sz, x, y,  xErr, yWidth );
+    //TGraphErrors* g1 = new TGraphErrors( sz, x, y,  xErr, yWidth );
+    TGraphErrors* g1 = new TGraphErrors( sz, x, y,  xErr, yErr );
     g1->SetMaximum( yMax );
     g1->SetMinimum( yMin );
     g1->SetMarkerColor(4);

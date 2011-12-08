@@ -59,6 +59,9 @@ class hJetTime : public hObj {
    jet0xTE  = new TH1D("jet0xTE",   " leading Endcap jet Time spectrum from leading xtals in BC", 250, -4., 21.);
    jet0lTE  = new TH1D("jet0lTE",   " leading jet Time spectrum from leading xtals in EE", 250, -4., 21.);
 
+   elelTB  = new TH1D("elelTB",   " electron Time spectrum from leading xtals in EB", 250, -4., 21.);
+   elelTE  = new TH1D("elelTE",   " electron Time spectrum from leading xtals in EE", 250, -4., 21.);
+
    jet1Pt   = new TH1D("jet1Pt",   " 2nd jet Pt spectrum ", 50,   0., 1000.);
    jet1xT   = new TH1D("jet1xT",   " 2nd jet Time spectrum from leading xtals in BC", 250, -4., 21.);
    jet1lT   = new TH1D("jet1lT",   " 2nd jet Time spectrum from leading xtals", 250, -4., 21.);
@@ -131,6 +134,9 @@ class hJetTime : public hObj {
     delete jet1xT ;
     delete jet1lT ;
 
+    delete elelTB ;
+    delete elelTE ;
+
     delete phoXtalTErr ;
     delete phoXtalTime ;
     delete jetXtalTErr ;
@@ -194,6 +200,9 @@ class hJetTime : public hObj {
   TH1D* jet0lTE ;
   TH1D* jet1xT ;
   TH1D* jet1lT ;
+
+  TH1D* elelTB;
+  TH1D* elelTE;
 
   TH1D* phoXtalTErr ;
   TH1D* phoXtalTime ;

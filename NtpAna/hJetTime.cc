@@ -369,6 +369,13 @@ void hJetTime::FitNDraw( string hfolder, string plotType ) {
       jet0lTE->Draw() ;
       ///c5->Update();
 
+      p1_ = jet0xTE->GetMean(1) ;
+      p2_ = jet0xTE->GetRMS(1) ;
+      yMin = p1_ - (2.*p2_) ;
+      yMax = p1_ + (2.*p2_) ;
+      func->SetParLimits(1, p1_-p2_ , p1_+p2_ );
+      func->SetParLimits(2, p2_*0.5 , p2_*1.5 );
+
       gStyle->SetOptFit(111);
       jet0xTE->Fit(func, "RQ0", "", yMin, yMax);
 
@@ -399,6 +406,13 @@ void hJetTime::FitNDraw( string hfolder, string plotType ) {
       jet1lT->Draw() ;
       //c5->Update();
 
+      p1_ = jet1xT->GetMean(1) ;
+      p2_ = jet1xT->GetRMS(1) ;
+      yMin = p1_ - (2.*p2_) ;
+      yMax = p1_ + (2.*p2_) ;
+      func->SetParLimits(1, p1_-p2_ , p1_+p2_ );
+      func->SetParLimits(2, p2_*0.5 , p2_*1.5 );
+
       gStyle->SetOptFit(111);
       jet1xT->Fit(func, "RQ0", "", yMin, yMax);
 
@@ -422,8 +436,15 @@ void hJetTime::FitNDraw( string hfolder, string plotType ) {
       plotname5 = hfolder + "jet1Time" + "."+plotType ;
       c5->Print( plotname5 );
 
-      c5->cd();
       // photon/xtal in Barrel
+      c5->cd();
+      p1_ = pho0lTB->GetMean(1) ;
+      p2_ = pho0lTB->GetRMS(1) ;
+      yMin = p1_ - (2.*p2_) ;
+      yMax = p1_ + (2.*p2_) ;
+      func->SetParLimits(1, p1_-p2_ , p1_+p2_ );
+      func->SetParLimits(2, p2_*0.2 , p2_*1.5 );
+
       gStyle->SetOptStat("eou");
       gStyle->SetOptFit(111);
       pho0lTB->Fit(func, "RQ0", "", yMin, yMax);
@@ -454,6 +475,13 @@ void hJetTime::FitNDraw( string hfolder, string plotType ) {
       c5->Print( plotname5 );
 
       // photon/xtal in Endcap
+      p1_ = pho0lTE->GetMean(1) ;
+      p2_ = pho0lTE->GetRMS(1) ;
+      yMin = p1_ - (2.*p2_) ;
+      yMax = p1_ + (2.*p2_) ;
+      func->SetParLimits(1, p1_-p2_ , p1_+p2_ );
+      func->SetParLimits(2, p2_*0.5 , p2_*1.5 );
+
       gStyle->SetOptStat("eou");
       gStyle->SetOptFit(111);
       pho0lTE->Fit(func, "RQ0", "", yMin, yMax);
@@ -483,7 +511,51 @@ void hJetTime::FitNDraw( string hfolder, string plotType ) {
       plotname5 = hfolder + "EndcapPhotonTime" + "."+plotType ;
       c5->Print( plotname5 );
 
+      c5->cd();
+      gStyle->SetOptStat("eroum");
+      gStyle->SetStatY(0.9);
+      gStyle->SetStatTextColor(2);
+      elelTB->SetLineColor(2) ;
+      elelTB->Draw() ;
 
+      p1_ = elelTB->GetMean(1) ;
+      p2_ = elelTB->GetRMS(1) ;
+      yMin = p1_ - (2.*p2_) ;
+      yMax = p1_ + (2.*p2_) ;
+      func->SetParLimits(1, p1_-p2_ , p1_+p2_ );
+      func->SetParLimits(2, p2_*0.5 , p2_*1.5 );
+
+      gStyle->SetOptFit(111);
+      elelTB->Fit(func, "RQ0", "", yMin, yMax);
+      func->SetLineColor(2);
+      func->DrawCopy("same") ;
+      c5->Update();
+
+      plotname5 = hfolder + "BarrelEleTime" + "."+plotType ;
+      c5->Print( plotname5 );
+
+      c5->cd();
+      gStyle->SetOptStat("eroum");
+      gStyle->SetStatY(0.9);
+      gStyle->SetStatTextColor(2);
+      elelTE->SetLineColor(2) ;
+      elelTE->Draw() ;
+
+      p1_ = pho0lTE->GetMean(1) ;
+      p2_ = pho0lTE->GetRMS(1) ;
+      yMin = p1_ - (2.*p2_) ;
+      yMax = p1_ + (2.*p2_) ;
+      func->SetParLimits(1, p1_-p2_ , p1_+p2_ );
+      func->SetParLimits(2, p2_*0.5 , p2_*1.5 );
+
+      gStyle->SetOptFit(111);
+      elelTE->Fit(func, "RQ0", "", yMin, yMax);
+      func->SetLineColor(2);
+      func->DrawCopy("same") ;
+      c5->Update();
+
+      plotname5 = hfolder + "EndcapEleTime" + "."+plotType ;
+      c5->Print( plotname5 );
 
       // dT( T_photon - T_jet ) 
       c5->SetLogy();
@@ -495,7 +567,7 @@ void hJetTime::FitNDraw( string hfolder, string plotType ) {
       p2_ = dT_JetPho->GetRMS(1) ;
       yMin = p1_ - (1.5*p2_) ;
       yMax = p1_ + (1.5*p2_) ;
-      func = new TF1("func",MathFunctions::fitGS, yMin, yMax, 3 );
+      //func = new TF1("func",MathFunctions::fitGS, yMin, yMax, 3 );
       //cout<<" ***  m = "<<p1_<<" s = "<< p2_ <<" h2 m:"<< h2->GetMean(2) << endl ;
       //TF1 *func = new TF1("func",MathFunctions::fitGS, yMin, yMax, 3 );
       func->SetParLimits(1, p1_-p2_ , p1_+p2_ );

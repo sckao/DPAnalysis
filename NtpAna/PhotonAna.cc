@@ -8,6 +8,7 @@ PhotonAna::PhotonAna( string datacardfile ){
   Input->GetParameters("Path",          &hfolder ) ; 
   Input->GetParameters("ProcessEvents", &ProcessEvents ) ; 
 
+  Input->GetParameters( "VertexCuts",   &vtxCuts );
   Input->GetParameters( "PhotonCuts",   &photonCuts );
   Input->GetParameters( "ElectronCuts", &electronCuts );
   Input->GetParameters( "JetCuts",      &jetCuts );
@@ -20,8 +21,10 @@ PhotonAna::PhotonAna( string datacardfile ){
   Input->GetParameters( "DoTimeCorrection",  &doTimeCorrection );
   //Input->GetParameters("Debug", &debugStr ) ; 
   //if ( debugStr == "True" ) debug = true ;
+
   theTimeCorrector_.initEB("EB");
   theTimeCorrector_.initEE("EE");
+
 
 }
 
@@ -46,18 +49,19 @@ void PhotonAna::ReadTree() {
    float CPIdx[MAXC], clusterTime[MAXC], clusterEnergy[MAXC]; 
    float xtalInBCEnergy[MAXC][MAXXTALINC], xtalInBCTime[MAXC][MAXXTALINC], xtalInBCTimeErr[MAXC][MAXXTALINC];
    float xtalInBCEta[MAXC][MAXXTALINC],    xtalInBCPhi[MAXC][MAXXTALINC],  xtalADC[MAXC][MAXXTALINC] ;
-   float xtalChi2[MAXC][MAXXTALINC];
+   float xtalChi2[MAXC][MAXXTALINC], xtalOutTimeChi2[MAXC][MAXXTALINC];
    float clusterPhi[MAXC], clusterEta[MAXC] ;
-   float vtxX[MAXVTX], vtxY[MAXVTX], vtxZ[MAXVTX], vtxChi2[MAXVTX], vtxNTracks[MAXVTX];
+   float vtxX[MAXVTX], vtxY[MAXVTX], vtxZ[MAXVTX], vtxChi2[MAXVTX], vtxNdof[MAXVTX];
    int   nXtalInBC[MAXC], clusterXtals[MAXC] ;
    float metPx, metPy, metE ;
-   int   nJets, nPhotons, nElectrons, eventId, nClusters ;
+   int   nJets, nPhotons, nElectrons, nVertices, eventId, nClusters ;
 
    tr->SetBranchAddress("eventId",    &eventId);
    tr->SetBranchAddress("nJets",      &nJets);
    tr->SetBranchAddress("nPhotons",   &nPhotons);
    tr->SetBranchAddress("nElectrons", &nElectrons);
    tr->SetBranchAddress("nClusters",  &nClusters);
+   tr->SetBranchAddress("nVertices",  &nVertices );
    tr->SetBranchAddress("metPx",      &metPx );
    tr->SetBranchAddress("metPy",      &metPy );
    tr->SetBranchAddress("met",        &metE );
@@ -87,14 +91,15 @@ void PhotonAna::ReadTree() {
    tr->SetBranchAddress("xtalInBCTimeErr", xtalInBCTimeErr );
    tr->SetBranchAddress("xtalInBCEta",     xtalInBCEta );
    tr->SetBranchAddress("xtalInBCPhi",     xtalInBCPhi );
-   tr->SetBranchAddress("xtalInBCAmplitudeADC", xtalADC );
-   tr->SetBranchAddress("xtalInBCChi2",    xtalChi2 );
+   tr->SetBranchAddress("xtalInBCAmplitudeADC",   xtalADC );
+   tr->SetBranchAddress("xtalInBCChi2",           xtalChi2 );
+   tr->SetBranchAddress("xtalInBCOutOfTimeChi2",  xtalOutTimeChi2 );
 
    tr->SetBranchAddress("vtxX",       vtxX );
    tr->SetBranchAddress("vtxY",       vtxY );
    tr->SetBranchAddress("vtxZ",       vtxZ );
    tr->SetBranchAddress("vtxChi2",    vtxChi2 );
-   tr->SetBranchAddress("vtxNTracks", vtxNTracks );
+   tr->SetBranchAddress("vtxNdof",    vtxNdof );
 
    int totalN = tr->GetEntries();
    cout<<" total entries = "<< totalN <<" Process "<< ProcessEvents <<endl;
@@ -104,7 +109,14 @@ void PhotonAna::ReadTree() {
        tr->GetEntry( i );
 
        if ( i%2 == split ) continue ;    
- 
+
+       //0. vertex cuts
+       if ( nVertices < 1 ) continue ;
+       if ( vtxNdof[0]    <= vtxCuts[0] )  continue;
+       if ( fabs(vtxZ[0])  > vtxCuts[1] )  continue;
+       double vtxRho = sqrt( (vtxX[0]*vtxX[0]) + (vtxY[0]*vtxY[0]) ); 
+       if ( vtxRho > vtxCuts[2] )  continue;
+     
        //cout<<" Event "<< eventId <<endl ;
        // 1. met selection
        TLorentzVector metp4( metPx, metPy, 0., metE ) ;
@@ -219,15 +231,15 @@ void PhotonAna::ReadTree() {
 
 	       hJets.phoXtalTime->Fill( xtalTime); 
 	       hJets.phoXtalTErr->Fill( xtalInBCTimeErr[x][y] ); 
-               if ( fabs(xtalInBCEta[x][y])  < 1.479 ) hJets.xtalEB_Chi2_T->Fill( xtalChi2[x][y], xtalTime );
-               if ( fabs(xtalInBCEta[x][y]) >= 1.479 ) hJets.xtalEE_Chi2_T->Fill( xtalChi2[x][y], xtalTime );
-               hJets.xtal_Chi2_E->Fill( xtalChi2[x][y], xtalInBCEnergy[x][y]);
+               if ( fabs(xtalInBCEta[x][y])  < 1.479 ) hJets.xtalEB_Chi2_T->Fill( xtalOutTimeChi2[x][y], xtalTime );
+               if ( fabs(xtalInBCEta[x][y]) >= 1.479 ) hJets.xtalEE_Chi2_T->Fill( xtalOutTimeChi2[x][y], xtalTime );
+               hJets.xtal_Chi2_E->Fill( xtalOutTimeChi2[x][y], xtalInBCEnergy[x][y]);
                hJets.xtal_T_E->Fill( xtalTime, xtalInBCEnergy[x][y]);
 
 	       if ( xtalInBCEnergy[x][y] < XtalCuts[0] ) continue ;
 	       if ( xtalInBCTimeErr[x][y] < 0.2 || xtalInBCTimeErr[x][y] > XtalCuts[1] ) continue ;
-               if ( fabs(xtalInBCEta[x][y])  < 1.479 && xtalChi2[x][y] > XtalCuts[2] ) continue ;
-               if ( fabs(xtalInBCEta[x][y]) >= 1.479 && xtalChi2[x][y] > XtalCuts[3] ) continue ;
+               if ( fabs(xtalInBCEta[x][y])  < 1.479 && xtalOutTimeChi2[x][y] > XtalCuts[2] ) continue ;
+               if ( fabs(xtalInBCEta[x][y]) >= 1.479 && xtalOutTimeChi2[x][y] > XtalCuts[3] ) continue ;
 
 	       if ( xtalInBCEnergy[x][y] > gleadEnergy ) {                         
                   gleadEnergy = xtalInBCEnergy[x][y] ;
@@ -252,8 +264,10 @@ void PhotonAna::ReadTree() {
           gTime  = gTime  / ngC ;
 	  if ( gp4.Eta()  < 1.479 ) hJets.pho0xTB->Fill( gTime ); 
 	  if ( gleadEta   < 1.479 ) hJets.pho0lTB->Fill( gleadTime ); 
+	  if ( gleadEta   < 1.479 ) hJets.g0_met_TB->Fill( metE, gleadTime ); 
 	  if ( gp4.Eta() >= 1.479 ) hJets.pho0xTE->Fill( gTime ); 
 	  if ( gleadEta  >= 1.479 ) hJets.pho0lTE->Fill( gleadTime ); 
+	  if ( gleadEta  >= 1.479 ) hJets.g0_met_TE->Fill( metE, gleadTime ); 
        }
 
         
@@ -298,9 +312,9 @@ void PhotonAna::ReadTree() {
                        + (xtalInBCTime[x][y]*theTimeCorrector_.getCorrection( (float) xtalInBCEnergy[x][y], xtalInBCEta[x][y]) );
                    if ( doTimeCorrection == 0 )  xtalTime = xtalInBCTime[x][y] ;
 
-                   if ( fabs(xtalInBCEta[x][y])  < 1.479 ) hJets.xtalEB_Chi2_T->Fill( xtalChi2[x][y], xtalTime );
-                   if ( fabs(xtalInBCEta[x][y]) >= 1.479 ) hJets.xtalEE_Chi2_T->Fill( xtalChi2[x][y], xtalTime );
-                   hJets.xtal_Chi2_E->Fill( xtalChi2[x][y], xtalInBCEnergy[x][y]);
+                   if ( fabs(xtalInBCEta[x][y])  < 1.479 ) hJets.xtalEB_Chi2_T->Fill( xtalOutTimeChi2[x][y], xtalTime );
+                   if ( fabs(xtalInBCEta[x][y]) >= 1.479 ) hJets.xtalEE_Chi2_T->Fill( xtalOutTimeChi2[x][y], xtalTime );
+                   hJets.xtal_Chi2_E->Fill( xtalOutTimeChi2[x][y], xtalInBCEnergy[x][y]);
                    hJets.xtal_T_E->Fill( xtalTime, xtalInBCEnergy[x][y]);
 
 		   if ( j == 0 ) hJets.jetXtalTime->Fill( xtalTime ); 
@@ -309,8 +323,8 @@ void PhotonAna::ReadTree() {
 
                    if ( xtalInBCEnergy[x][y] < XtalCuts[0] ) continue ;
 		   if ( xtalInBCTimeErr[x][y] < 0.2 || xtalInBCTimeErr[x][y] > XtalCuts[1] ) continue ;
-                   if ( fabs(xtalInBCEta[x][y])  < 1.479 && xtalChi2[x][y] > XtalCuts[2] ) continue ;
-                   if ( fabs(xtalInBCEta[x][y]) >= 1.479 && xtalChi2[x][y] > XtalCuts[3] ) continue ;
+                   if ( fabs(xtalInBCEta[x][y])  < 1.479 && xtalOutTimeChi2[x][y] > XtalCuts[2] ) continue ;
+                   if ( fabs(xtalInBCEta[x][y]) >= 1.479 && xtalOutTimeChi2[x][y] > XtalCuts[3] ) continue ;
 		   double dRxj = DeltaR( xtalInBCEta[x][y], xtalInBCPhi[x][y] , jetV[j].Eta(), jetV[j].Phi()  ) ;
 		   if ( dRxj > XtalCuts[4] ) continue ;
 
@@ -349,9 +363,11 @@ void PhotonAna::ReadTree() {
 	      hJets.jet_Pt_nXtal->Fill( jp4.Pt() , nXtal ) ;
 	      if ( j == 0 ) { 
 	         if ( jp4.Eta()  < 1.479 ) hJets.jet0xTB->Fill( jxTime ); 
+	         if ( jp4.Eta()  < 1.479 ) hJets.j0_met_TB->Fill( metE, jxTime ); 
 		 if ( jleadEta   < 1.479 ) hJets.jet0lTB->Fill( jleadTime ); 
 	         if ( jp4.Eta() >= 1.479 ) hJets.jet0xTE->Fill( jxTime ); 
 		 if ( jleadEta  >= 1.479 ) hJets.jet0lTE->Fill( jleadTime ); 
+	         if ( jp4.Eta() >= 1.479 ) hJets.j0_met_TE->Fill( metE, jxTime ); 
 		 hJets.jet0Pt_T->Fill( jp4.Pt() , jxTime ) ;
 		 hJets.jet0Eta_T->Fill( jp4.Eta() , jxTime ) ;
 	      }
@@ -374,7 +390,7 @@ void PhotonAna::ReadTree() {
            float eleadEta    = 999 ;
 	   int   nXtal       = 0 ; 
 	   for (int x =0; x< nClusters; x++) {
-
+ 
 	       if ( CPIdx[x] < 11. || CPIdx[x] > 12. ) continue ;
 
 	       //float jidx =  11. + (j+1.)*0.1 ;
@@ -390,8 +406,8 @@ void PhotonAna::ReadTree() {
 
                    if ( xtalInBCEnergy[x][y] < XtalCuts[0] ) continue ;
 		   if ( xtalInBCTimeErr[x][y] < 0.2 || xtalInBCTimeErr[x][y] > XtalCuts[1] ) continue ;
-                   if ( fabs(xtalInBCEta[x][y])  < 1.479 && xtalChi2[x][y] > XtalCuts[2] ) continue ;
-                   if ( fabs(xtalInBCEta[x][y]) >= 1.479 && xtalChi2[x][y] > XtalCuts[3] ) continue ;
+                   if ( fabs(xtalInBCEta[x][y])  < 1.479 && xtalOutTimeChi2[x][y] > XtalCuts[2] ) continue ;
+                   if ( fabs(xtalInBCEta[x][y]) >= 1.479 && xtalOutTimeChi2[x][y] > XtalCuts[3] ) continue ;
 		   //double dRxj = DeltaR( xtalInBCEta[x][y], xtalInBCPhi[x][y] , eleV[j].Eta(), eleV[j].Phi()  ) ;
 		   //if ( dRxj > XtalCuts[4] ) continue ;
                    nXtal++ ;
@@ -418,12 +434,14 @@ void PhotonAna::ReadTree() {
 void PhotonAna::ScalarPlotList() {
 
    bool debugPlots = false ;
-   ScalarPlotter( hJets.g0_xtalEB_ADC_T, "g0_xtalEB_ADC_T", -1., 1., 5, 1, debugPlots ) ;
-   ScalarPlotter( hJets.j0_xtalEB_ADC_T, "j0_xtalEB_ADC_T", -1., 1., 5, 1 ) ;
-   ScalarPlotter( hJets.j0_xtalEE_ADC_T, "j0_xtalEE_ADC_T", -1., 1., 5, 1 ) ;
-   ScalarPlotter( hJets.j0_xtalEta_ADC,  "j0_xtalEta_ADC",   0., 1000., 1  ) ;
-   ScalarPlotter( hJets.jet0Eta_T,    "jet_Eta_Time",  -1,   1 ) ;
-   ScalarPlotter( hJets.jet0Pt_T,     "jet_Pt_Time",   -1,   1, 1, 1 ) ;
+   int logX       = 1  ;   // set logX = 1 or 0
+   ScalarPlotter( hJets.g0_xtalEB_ADC_T, "g0_xtalEB_ADC_T", -1.,    1., 5, logX, debugPlots ) ;
+   ScalarPlotter( hJets.j0_xtalEB_ADC_T, "j0_xtalEB_ADC_T", -1.,    1., 5, logX ) ;
+   ScalarPlotter( hJets.j0_xtalEE_ADC_T, "j0_xtalEE_ADC_T", -1.,    1., 5, logX ) ;
+   ScalarPlotter( hJets.g0_xtalEta_ADC,  "g0_xtalEta_ADC",   0., 1000., 1 ) ;
+   ScalarPlotter( hJets.j0_xtalEta_ADC,  "j0_xtalEta_ADC",   0., 1000., 1 ) ;
+   ScalarPlotter( hJets.jet0Pt_T,        "jet_Pt_Time",      -1,    1., 1, logX ) ;
+   ScalarPlotter( hJets.jet0Eta_T,       "jet_Eta_Time",     -1,    1., 1 ) ;
 
 }
 
@@ -446,6 +464,7 @@ void PhotonAna::ScalarPlotter( TH2D* h2, TString hname, double yMin, double yMax
     const int sz = static_cast<const int>( xV.size() );
     float  x[sz] , xErr[sz], y[sz], yWidth[sz], yErr[sz] ;
     float yErrMax = 0 ;
+    float yWidthMax = 0 ;
     for ( int i=0; i< sz; i++) {
         x[i] = xV[i] ;
         y[i] = yV[i] ;
@@ -453,6 +472,7 @@ void PhotonAna::ScalarPlotter( TH2D* h2, TString hname, double yMin, double yMax
         yWidth[i] = yWidthV[i] ;
         yErr[i] = yErrV[i] ;
         yErrMax = ( yErr[i] > yErrMax ) ? yErr[i] : yErrMax ;
+        yWidthMax = ( yWidth[i] > yWidthMax ) ? yWidth[i] : yWidthMax ;
     }
 
     c1->cd();
@@ -474,8 +494,8 @@ void PhotonAna::ScalarPlotter( TH2D* h2, TString hname, double yMin, double yMax
     TString plotname = hfolder + hname +  "_pj."+plotType ;
     c1->Print( plotname );
 
-    TGraph* g2 = new TGraph( sz, x, yErr );
-    g2->SetMaximum( yErrMax*2 );
+    TGraph* g2 = new TGraph( sz, x, yWidth );
+    g2->SetMaximum( yWidthMax*2 );
     g2->SetMinimum( 0. );
     g2->SetMarkerColor(4);
     g2->SetMarkerStyle(20);
@@ -498,12 +518,20 @@ void PhotonAna::ScalarPlotter( TH2D* h2, TString hname, double yMin, double yMax
 void PhotonAna::BinningFitScan( TH2D* h2, vector<double>& xV, vector<double>& yV, vector<double>& yWidthV, 
                                 vector<double>& yErrV ,bool debugPlots, int rbin, int startBin, int finalBin ) {
 
-    int      sz = h2->GetNbinsX();
+    int sz = h2->GetNbinsX();
+    int b1 = startBin ;
+    int b2 = startBin ;
     for ( int i=0; i< sz; i++) {
-        int b1 = startBin + (i*rbin) ;
-        int b2 = b1 + rbin - 1 ;
-        int bcen = (b1 + b2) / 2 ; 
+        //int b1 = startBin + (i*rbin) ;
+        //int b2 = b1 + rbin - 1 ;
+        b1 = b2 + rbin ;
+        b2 = b1 + rbin - 1 ;
         if ( b1 == finalBin || b1 > sz ) break;
+
+        double stat = h2->Integral(b1,b2) ;
+        if ( stat < 100 ) b2 = b1 + (rbin*2) -1 ;
+
+        int bcen = (b1 + b2) / 2 ; 
         vector<double> results = BinningFit( h2, "h2Py", b1, b2, debugPlots ) ;
 
         if ( results[2] == 0. ) continue ;

@@ -309,6 +309,41 @@ void hJetTime::Draw( string hfolder, string plotType ) {
       plotname4 = hfolder + "xtal_T_E" + "."+plotType ;
       c4->Print( plotname4 );
 
+      c4->cd();
+      gStyle->SetPalette(1);
+      gStyle->SetNumberContours(5);
+      gStyle->SetStatX(0.9);
+      g0_met_TB->Draw("COLZ") ;
+      c4->Update();
+      plotname4 = hfolder + "g0_met_TB" + "."+plotType ;
+      c4->Print( plotname4 );
+
+      c4->cd();
+      gStyle->SetPalette(1);
+      gStyle->SetNumberContours(5);
+      gStyle->SetStatX(0.9);
+      g0_met_TE->Draw("COLZ") ;
+      c4->Update();
+      plotname4 = hfolder + "g0_met_TE" + "."+plotType ;
+      c4->Print( plotname4 );
+
+      c4->cd();
+      gStyle->SetPalette(1);
+      gStyle->SetNumberContours(5);
+      gStyle->SetStatX(0.9);
+      j0_met_TB->Draw("COLZ") ;
+      c4->Update();
+      plotname4 = hfolder + "j0_met_TB" + "."+plotType ;
+      c4->Print( plotname4 );
+
+      c4->cd();
+      gStyle->SetPalette(1);
+      gStyle->SetNumberContours(5);
+      gStyle->SetStatX(0.9);
+      j0_met_TE->Draw("COLZ") ;
+      c4->Update();
+      plotname4 = hfolder + "j0_met_TE" + "."+plotType ;
+      c4->Print( plotname4 );
 }
 
 void hJetTime::FitNDraw( string hfolder, string plotType ) {
@@ -571,7 +606,7 @@ void hJetTime::FitNDraw( string hfolder, string plotType ) {
       //cout<<" ***  m = "<<p1_<<" s = "<< p2_ <<" h2 m:"<< h2->GetMean(2) << endl ;
       //TF1 *func = new TF1("func",MathFunctions::fitGS, yMin, yMax, 3 );
       func->SetParLimits(1, p1_-p2_ , p1_+p2_ );
-      func->SetParLimits(2, p2_*0.3 , p2_*1.5 );
+      func->SetParLimits(2, p2_*0.1 , p2_*1.5 );
 
       dT_JetPho->Fit(func, "R", "", yMin, yMax);
 

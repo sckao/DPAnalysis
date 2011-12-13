@@ -70,6 +70,7 @@ private:
    vector<TLorentzVector> eleV ;
    vector<float> eIdV ;
 
+   vector<double> vtxCuts ;
    vector<double> photonCuts ;
    vector<double> electronCuts ;
    vector<double> jetCuts ;

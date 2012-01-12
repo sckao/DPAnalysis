@@ -55,6 +55,8 @@ public:
 
    double DeltaR( float eta1, float phi1, float eta2, float phi2 ) ;
 
+   bool GammaJetsBackground( TLorentzVector gP4, vector<TLorentzVector> jP4s ) ; 
+
 private:
 
    AnaInput*       Input;

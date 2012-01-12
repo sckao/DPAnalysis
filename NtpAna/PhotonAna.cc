@@ -25,7 +25,6 @@ PhotonAna::PhotonAna( string datacardfile ){
   theTimeCorrector_.initEB("EB");
   theTimeCorrector_.initEE("EE");
 
-
 }
 
 PhotonAna::~PhotonAna(){
@@ -158,11 +157,9 @@ void PhotonAna::ReadTree() {
        int gid = -1 ;
        double maxPhotonPt = photonCuts[0] ;
        for ( int i=0 ; i< nPhotons; i++ ) {
-           bool SignalLike = false ;
            TLorentzVector phoP4( phoPx[i], phoPy[i], phoPz[i], phoE[i] ) ;
            if ( phoP4.Pt() < photonCuts[0] || fabs(phoP4.Eta()) > photonCuts[1] ) continue ;
-           if ( phoP4.Pt() > 100. ) SignalLike = true ;
-           if ( SignalLike && selectBackground == 1 ) continue ;
+           if ( phoP4.Pt() > 100. && selectBackground == 2 ) continue ;  // QCD background requirement
            // check the isolation -- using dR_gj
            double dR_gj = 999. ;
            double jpt = 0 ;
@@ -198,6 +195,9 @@ void PhotonAna::ReadTree() {
 
        // event profile
        TLorentzVector gp4( phoPx[gid], phoPy[gid], phoPz[gid], phoE[gid] ) ;
+       bool isGammaJets = GammaJetsBackground( gp4, jetV ) ;
+       if ( selectBackground == 1 && !isGammaJets )  continue ;
+
        hJets.pho0Pt->Fill( gp4.Pt() );
        hJets.pho0Eta->Fill( gp4.Eta() );
        hJets.hMET->Fill( metE );
@@ -529,8 +529,14 @@ void PhotonAna::BinningFitScan( TH2D* h2, vector<double>& xV, vector<double>& yV
         if ( b1 == finalBin || b1 > sz ) break;
 
         double stat = h2->Integral(b1,b2) ;
-        if ( stat < 100 ) b2 = b1 + (rbin*2) -1 ;
+        int k = 1 ;
+        do {
+           k++ ;
+           b2 = b1 + (rbin*k) -1 ;
+           stat = h2->Integral(b1,b2) ;
+        } while( stat < 200 && b2 < sz ) ;
 
+        cout<<i<<" : "<<b1 <<" - "<<b2 <<endl;
         int bcen = (b1 + b2) / 2 ; 
         vector<double> results = BinningFit( h2, "h2Py", b1, b2, debugPlots ) ;
 
@@ -608,5 +614,23 @@ double PhotonAna::DeltaR( float eta1, float phi1, float eta2, float phi2 ) {
       double dR = sqrt( (df*df) + (dh*dh) ) ;
 
       return dR ;
+}
+
+bool PhotonAna::GammaJetsBackground( TLorentzVector gP4, vector<TLorentzVector> jP4s ) {
+
+    bool pass = true ;
+
+    if ( jP4s.size() < 1 ) return false ;
+
+    double dPhi   = gP4.DeltaPhi( jP4s[0] ) ;
+    double ratio1 = jP4s[0].Pt() / gP4.Pt() ;
+    double ratio2 = ( jP4s.size() > 1 ) ? jP4s[1].Pt() / gP4.Pt() : 0. ;
+
+    if ( dPhi <= (2*3.141592/3) )         pass = false ;
+    if ( ratio1 >= 1.3 || ratio1 <= 0.7 ) pass = false ;
+    if ( ratio2 >= 0.1 )                  pass = false ;
+
+    return pass ;
+
 }
 

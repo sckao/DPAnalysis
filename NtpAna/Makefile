@@ -1,25 +1,35 @@
-CC = g++
-ROOTFLAG = `${ROOTSYS}/bin/root-config --cflags --libs --glibs`
-CXXFALGS = -g -fPIC -Wall -O -ansi -D_GNU_SOURCE -O2
-CXX = -m64
+CC=g++ -g -fPIC -Wall -O -ansi -D_GNU_SOURCE -g -O2 -m64
+ROOTFLAG = `${ROOTSYS}/bin/root-config --cflags`
+LIB=`${ROOTSYS}/bin/root-config --libs`
+GLIB=`${ROOTSYS}/bin/root-config --glibs`
 
-OBJECTS = main.o MathFunctions.o AnaInput.o hJetTime.o PhotonAna.o timeVsAmpliCorrector.o
+OBJECTS=MathFunctions.o AnaInput.o hJetTime.o Selection.o PhotonAna.o timeVsAmpliCorrector.o Sync.o
 
-ana.exe : $(OBJECTS)
-	$(CC) $(CXXFLAGS) $(CXX) $(ROOTFLAG)  $(OBJECTS) -lMinuit -o ana.exe
+all:ana.exe
 
-main.o : main.cc
-	$(CC) -c $(CXX)  main.cc $(ROOTFLAG)
 MathFunctions.o : MathFunctions.cc
-	$(CC) -c $(CXX)  MathFunctions.cc $(ROOTFLAG)
-AnaInput.o : AnaInput.cc
-	$(CC) -c $(CXX)  AnaInput.cc $(ROOTFLAG)
-hJetTime.o : hJetTime.cc
-	$(CC) -c $(CXX) hJetTime.cc $(ROOTFLAG)
-PhotonAna.o : PhotonAna.cc
-	$(CC) -c $(CXX) PhotonAna.cc $(ROOTFLAG)
-timeVsAmpliCorrector.o : timeVsAmpliCorrector.cc
-	$(CC) -c $(CXX)  timeVsAmpliCorrector.cc $(ROOTFLAG)
+	$(CC) -c -o $@ $< $(ROOTFLAG) $(LIB)
+        
+AnaInput.o : AnaInput.cc 
+	$(CC) -c -o $@ $< $(ROOTFLAG) $(LIB)
+
+hJetTime.o : hJetTime.cc 
+	$(CC) -c -o $@ $< $(ROOTFLAG) $(LIB)
+
+Selection.o : Selection.cc 
+	$(CC) -c -o $@ $< $(ROOTFLAG) $(LIB)
+
+timeVsAmpliCorrector.o : timeVsAmpliCorrector.cc 
+	$(CC) -c -o $@ $< $(ROOTFLAG) $(LIB)
+
+PhotonAna.o : PhotonAna.cc 
+	$(CC) -c -o $@ $< $(ROOTFLAG) $(LIB)
+
+Sync.o : Sync.cc 
+	$(CC) -c -o $@ $< $(ROOTFLAG) $(LIB)
+
+ana.exe : main.cc $(OBJECTS)
+	$(CC) -o $@ $< $(OBJECTS) $(ROOTFLAG) $(LIB) $(GLIB)
 
 clean : 
 	rm -rf *.o ana.exe

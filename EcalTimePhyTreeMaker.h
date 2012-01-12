@@ -14,10 +14,9 @@ Implementation:
 <Notes on implementation>
  */
 //
-// Skeleton Derived from an example by:  F. DE GUIO C. DOGLIONI P. MERIDIANI
-// Authors:                              Seth Cooper, Giovanni Franzoni (UMN)
+// Authors:                   Shih-Chuan Kao, Giovanni Franzoni (UMN)
 //         Created:  Mo Jul 14 5:46:22 CEST 2008
-// $Id: EcalTimePhyTreeMaker.h,v 1.5 2011/09/10 11:03:44 franzoni Exp $
+// $Id: EcalTimePhyTreeMaker.h,v 1.3 2011/11/04 11:23:08 franzoni Exp $
 //
 //
 
@@ -35,11 +34,8 @@ Implementation:
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/Framework/interface/ESHandle.h"
 
-#include "DataFormats/EcalDigi/interface/EcalDigiCollections.h"
-#include "DataFormats/EcalRecHit/interface/EcalUncalibratedRecHit.h"
 #include "DataFormats/EcalRecHit/interface/EcalRecHitCollections.h"
 #include "DataFormats/DetId/interface/DetId.h"
-#include "DataFormats/EcalRawData/interface/EcalRawDataCollections.h"
 #include "DataFormats/L1GlobalMuonTrigger/interface/L1MuRegionalCand.h"
 #include "DataFormats/L1GlobalMuonTrigger/interface/L1MuGMTReadoutCollection.h"
 #include "DataFormats/L1GlobalTrigger/interface/L1GlobalTriggerReadoutRecord.h"
@@ -51,11 +47,6 @@ Implementation:
 #include "DataFormats/EgammaReco/interface/SuperClusterFwd.h"
 #include "RecoEcal/EgammaCoreTools/interface/EcalClusterLazyTools.h"
 #include "DataFormats/EgammaReco/interface/BasicClusterShapeAssociation.h"
-
-#include "DataFormats/MuonReco/interface/Muon.h"
-#include "DataFormats/MuonReco/interface/MuonFwd.h"
-
-#include "Geometry/EcalMapping/interface/EcalElectronicsMapping.h"
 
 #include "CondFormats/EcalObjects/interface/EcalIntercalibConstants.h"
 #include "CondFormats/EcalObjects/interface/EcalADCToGeVConstant.h"
@@ -73,8 +64,7 @@ Implementation:
 // *** for TrackAssociation
 #include "DataFormats/TrackReco/interface/Track.h"
 #include "DataFormats/Common/interface/Handle.h"
-#include "TrackingTools/TrackAssociator/interface/TrackDetectorAssociator.h"
-#include "TrackingTools/TrackAssociator/interface/TrackAssociatorParameters.h"
+
 #include "DataFormats/EcalDetId/interface/EcalSubdetector.h"
 #include "DataFormats/EcalDetId/interface/EBDetId.h"
 #include "DataFormats/EcalDetId/interface/EEDetId.h"
@@ -85,39 +75,42 @@ Implementation:
 #include "Geometry/CaloTopology/interface/CaloTopology.h"
 #include "Geometry/CaloEventSetup/interface/CaloTopologyRecord.h"
 #include "Geometry/Records/interface/IdealGeometryRecord.h"
-#include "Geometry/CaloGeometry/interface/CaloCellGeometry.h"
 #include "Geometry/EcalAlgo/interface/EcalBarrelGeometry.h"
 #include "RecoCaloTools/Navigation/interface/CaloNavigator.h"
 #include "Geometry/CaloGeometry/interface/CaloSubdetectorGeometry.h"
-
 #include "RecoLocalCalo/EcalRecAlgos/interface/EcalSeverityLevelAlgo.h"
-//
-#include "CalibCalorimetry/EcalTiming/interface/EcalTimePhyTreeContent.h"
 
-// for PAT Object selections
-#include "DataFormats/PatCandidates/interface/Jet.h"
-#include "DataFormats/PatCandidates/interface/MET.h"
-#include "DataFormats/PatCandidates/interface/Muon.h"
-#include "DataFormats/PatCandidates/interface/Electron.h"
-#include "DataFormats/PatCandidates/interface/Photon.h"
-#include "DataFormats/EgammaCandidates/interface/Photon.h"
 #include "DataFormats/ParticleFlowCandidate/interface/PFCandidate.h"
 #include "DataFormats/ParticleFlowReco/interface/PFBlock.h"
 #include "DataFormats/ParticleFlowReco/interface/PFBlockElement.h"
-
 #include "DataFormats/JetReco/interface/PFJetCollection.h"
+
+#include "FWCore/Common/interface/TriggerNames.h"
+#include "DataFormats/Common/interface/TriggerResults.h"
+
+#include "DataFormats/METReco/interface/PFMET.h"
 #include "DataFormats/METReco/interface/PFMETCollection.h"
+
 #include "DataFormats/MuonReco/interface/MuonFwd.h"
+#include "DataFormats/MuonReco/interface/Muon.h"
+
 #include "DataFormats/EgammaCandidates/interface/PhotonFwd.h"
+#include "DataFormats/EgammaCandidates/interface/Photon.h"
+
+#include "DataFormats/GsfTrackReco/interface/GsfTrack.h"
 #include "DataFormats/EgammaCandidates/interface/ElectronFwd.h"
-#include "DataFormats/EgammaCandidates/interface/Electron.h"
 #include "DataFormats/EgammaCandidates/interface/GsfElectronFwd.h"
+#include "RecoEcal/EgammaCoreTools/interface/EcalClusterTools.h"
+
+// containers for vertices
+#include <DataFormats/VertexReco/interface/VertexFwd.h>
 
 #include <TMath.h>
 #include <Math/VectorUtil.h>
 
-// containers for vertices
-#include <DataFormats/VertexReco/interface/VertexFwd.h>
+#include "CalibCalorimetry/EcalTiming/interface/EcalTimePhyTreeContent.h"
+#include "CalibCalorimetry/EcalTiming/interface/timeVsAmpliCorrector.h"
+
 
 typedef std::pair<reco::SuperClusterRef, float> ParticleSC  ;
 
@@ -140,8 +133,10 @@ class EcalTimePhyTreeMaker : public edm::EDAnalyzer
       std::string intToString (int num) ;
       void initHists (int) ;
 
+      //bool HLTSelection( const edm::Event& iEvent ) ;
+      int  HLTSelection( const edm::Event& iEvent ) ;
 
-      bool dumpPATObjectInfo( const edm::Event& iEvent ) ;
+      bool dumpEvtObjectInfo( const edm::Event& iEvent ) ;
 
       //! dump Cluster information
       //! has to run after dumpMUinfo, to have the XtalMap already filled
@@ -211,11 +206,12 @@ class EcalTimePhyTreeMaker : public edm::EDAnalyzer
       edm::InputTag barrelSuperClusterCollection_ ;
       edm::InputTag endcapSuperClusterCollection_ ;
       edm::InputTag muonCollection_ ;
-      edm::InputTag patJetSource_ ;
-      edm::InputTag patMETSource_ ;
-      edm::InputTag patMuonSource_ ;
-      edm::InputTag patElectronSource_ ;
-      edm::InputTag patPhotonSource_ ;
+      edm::InputTag JetSource_ ;
+      edm::InputTag METSource_ ;
+      edm::InputTag MuonSource_ ;
+      edm::InputTag ElectronSource_ ;
+      edm::InputTag PhotonSource_ ;
+      edm::InputTag triggerSource_ ;
       edm::InputTag vertexCollection_ ;
       edm::InputTag l1GMTReadoutRecTag_ ;
       edm::InputTag gtRecordCollectionTag_ ;
@@ -226,13 +222,11 @@ class EcalTimePhyTreeMaker : public edm::EDAnalyzer
       std::vector<double> jetCuts_ ;
       std::vector<double> metCuts_ ;
       std::vector<double> photonCuts_ ;
+      std::vector<double> photonIso_ ;
       std::vector<double> electronCuts_ ;
       std::vector<double> muonCuts_ ;
       std::string fileName_ ;
-      int  naiveId_ ; 
-
-      TrackDetectorAssociator trackAssociator_ ;
-      TrackAssociatorParameters trackParameters_ ;
+      std::string triggerName_ ;
 
       EcalTimePhyTreeContent myTreeVariables_ ;
 
@@ -248,6 +242,7 @@ class EcalTimePhyTreeMaker : public edm::EDAnalyzer
       edm::ESHandle<EcalLaserDbService> laser;
 
       std::vector<const reco::PFJet*> selectedJets ;
+      //std::vector<const reco::Electron*> selectedElectrons ;
       std::vector<const reco::GsfElectron*> selectedElectrons ;
       std::vector<const reco::Muon*> selectedMuons ;
       std::vector<const reco::Photon*> selectedPhotons ;
@@ -255,6 +250,10 @@ class EcalTimePhyTreeMaker : public edm::EDAnalyzer
 
       int numberOfSuperClusters ;
       int numberOfClusters ;
+
+      bool          doTimeVSAmpliCorrection_;
+      timeCorrector theTimeCorrector_;
+      int  naiveId_ ; 
 
 } ;
 

@@ -26,6 +26,7 @@
 #include "TLorentzVector.h"
 
 #include "AnaInput.h"
+#include "Selection.h"
 #include "Histograms.h"
 #include "MathFunctions.h"
 #include "timeVsAmpliCorrector.h"
@@ -59,7 +60,8 @@ public:
 
 private:
 
-   AnaInput*       Input;
+   AnaInput*     Input;
+   Selection*    select;
 
    string hfolder ;
    string plotType ;
@@ -68,8 +70,9 @@ private:
    hJetTime hJets ;
    string debugStr ;
 
-   vector<TLorentzVector> jetV ;
-   vector<TLorentzVector> eleV ;
+   vector<objID> jetV ;
+   vector<objID> eleV ;
+   vector<objID> phoV ;
    vector<float> eIdV ;
 
    vector<double> vtxCuts ;
@@ -83,6 +86,19 @@ private:
    int doTimeCorrection ;
 
    timeCorrector theTimeCorrector_;
+
+   float jetPx[MAXOBJ], jetPy[MAXOBJ], jetPz[MAXOBJ], jetE[MAXOBJ] ;
+   float phoPx[MAXOBJ], phoPy[MAXOBJ], phoPz[MAXOBJ], phoE[MAXOBJ] ;
+   float elePx[MAXOBJ], elePy[MAXOBJ], elePz[MAXOBJ], eleE[MAXOBJ] ;
+   float CPIdx[MAXC], clusterTime[MAXC], clusterEnergy[MAXC];
+   float xtalInBCEnergy[MAXC][MAXXTALINC], xtalInBCTime[MAXC][MAXXTALINC], xtalInBCTimeErr[MAXC][MAXXTALINC];
+   float xtalInBCEta[MAXC][MAXXTALINC],    xtalInBCPhi[MAXC][MAXXTALINC],  xtalADC[MAXC][MAXXTALINC] ;
+   float xtalChi2[MAXC][MAXXTALINC], xtalOutTimeChi2[MAXC][MAXXTALINC];
+   float clusterPhi[MAXC], clusterEta[MAXC] ;
+   float vtxX[MAXVTX], vtxY[MAXVTX], vtxZ[MAXVTX], vtxChi2[MAXVTX], vtxNdof[MAXVTX];
+   int   nXtalInBC[MAXC], clusterXtals[MAXC] ;
+   float metPx, metPy, metE ;
+   int   nJets, nPhotons, nElectrons, nVertices, eventId, nClusters ;
 
 
    //ClassDef(PhotonAna, 1);

@@ -2,7 +2,8 @@
 
 PhotonAna::PhotonAna( string datacardfile ){
 
-  Input = new AnaInput( datacardfile );
+  Input  = new AnaInput( datacardfile );
+  select = new Selection( datacardfile ) ;
   
   Input->GetParameters("PlotType",      &plotType ) ; 
   Input->GetParameters("Path",          &hfolder ) ; 
@@ -22,14 +23,15 @@ PhotonAna::PhotonAna( string datacardfile ){
   //Input->GetParameters("Debug", &debugStr ) ; 
   //if ( debugStr == "True" ) debug = true ;
 
+
   theTimeCorrector_.initEB("EB");
   theTimeCorrector_.initEE("EE");
 
 }
 
 PhotonAna::~PhotonAna(){
-
-  delete Input;
+  delete select ;
+  delete Input ;
   cout<<" done ! "<<endl ;
 
 }
@@ -41,19 +43,6 @@ void PhotonAna::ReadTree() {
    //Input->GetParameters( "TheData", &rFiles );
    //TTree* tr = Input->GetTree( rFiles[0],"EcalTimeAnalysis" );
    TTree* tr = Input->TreeMap( "data+" );
-
-   float jetPx[MAXOBJ], jetPy[MAXOBJ], jetPz[MAXOBJ], jetE[MAXOBJ] ;
-   float phoPx[MAXOBJ], phoPy[MAXOBJ], phoPz[MAXOBJ], phoE[MAXOBJ] ;
-   float elePx[MAXOBJ], elePy[MAXOBJ], elePz[MAXOBJ], eleE[MAXOBJ] ;
-   float CPIdx[MAXC], clusterTime[MAXC], clusterEnergy[MAXC]; 
-   float xtalInBCEnergy[MAXC][MAXXTALINC], xtalInBCTime[MAXC][MAXXTALINC], xtalInBCTimeErr[MAXC][MAXXTALINC];
-   float xtalInBCEta[MAXC][MAXXTALINC],    xtalInBCPhi[MAXC][MAXXTALINC],  xtalADC[MAXC][MAXXTALINC] ;
-   float xtalChi2[MAXC][MAXXTALINC], xtalOutTimeChi2[MAXC][MAXXTALINC];
-   float clusterPhi[MAXC], clusterEta[MAXC] ;
-   float vtxX[MAXVTX], vtxY[MAXVTX], vtxZ[MAXVTX], vtxChi2[MAXVTX], vtxNdof[MAXVTX];
-   int   nXtalInBC[MAXC], clusterXtals[MAXC] ;
-   float metPx, metPy, metE ;
-   int   nJets, nPhotons, nElectrons, nVertices, eventId, nClusters ;
 
    tr->SetBranchAddress("eventId",    &eventId);
    tr->SetBranchAddress("nJets",      &nJets);
@@ -110,93 +99,56 @@ void PhotonAna::ReadTree() {
        if ( i%2 == split ) continue ;    
 
        //0. vertex cuts
-       if ( nVertices < 1 ) continue ;
-       if ( vtxNdof[0]    <= vtxCuts[0] )  continue;
-       if ( fabs(vtxZ[0])  > vtxCuts[1] )  continue;
-       double vtxRho = sqrt( (vtxX[0]*vtxX[0]) + (vtxY[0]*vtxY[0]) ); 
-       if ( vtxRho > vtxCuts[2] )  continue;
-     
+       bool passVtx = select->VertexFilter();
+       if ( passVtx ) continue ;        
+
        //cout<<" Event "<< eventId <<endl ;
-       // 1. met selection
-       TLorentzVector metp4( metPx, metPy, 0., metE ) ;
-       if ( jetCuts[4] > 0 &&  metp4.Et() < jetCuts[4] ) continue ;
-       if ( jetCuts[4] < 0 &&  metp4.Et() > fabs( jetCuts[4] ) ) continue ;
-
-       // 2. jet selection
-       int nu_Jets = 0 ;
+       bool passJetMET = select->JetMETFilter() ;
+       if ( passJetMET ) continue ;
        jetV.clear() ;
-       for ( int j=0 ; j< nJets; j++ ) {
-           TLorentzVector jp4( jetPx[j], jetPy[j], jetPz[j], jetE[j] ) ;
-           if ( jp4.Pt() < jetCuts[0] || fabs(jp4.Eta()) > jetCuts[1] ) continue ;
-           nu_Jets++ ;
-           jetV.push_back( jp4 );
-       }
+       select->GetCollection( "Jet", jetV ) ;
+       int nu_Jets = (int) jetV.size() ;
        if ( nu_Jets < jetCuts[2] || nu_Jets > jetCuts[3] ) continue ;
-
+      
        // 2. get the leading electron info, just check
+       select->ElectronFilter();
        eleV.clear() ;
        eIdV.clear() ;
-       for ( int i=0 ; i< nElectrons; i++ ) {
-           TLorentzVector eP4( elePx[i], elePy[i], elePz[i], eleE[i] ) ;
-           if ( eP4.Pt() < electronCuts[0] || fabs( eP4.Eta()) > electronCuts[1] ) continue ;
-           // check the isolation -- using dR
-           double dR = 999. ;
-           for ( int j=0 ; j< nJets; j++ ) {
-               TLorentzVector jp4( jetPx[j], jetPy[j], jetPz[j], jetE[j] ) ;
-               if ( jp4.Pt() < jetCuts[0] || fabs(jp4.Eta()) > jetCuts[1] ) continue ;
-                dR  = (  eP4.DeltaR( jp4 ) < dR ) ?  eP4.DeltaR( jp4 ) : dR;
-           }
-           if ( dR < electronCuts[3] ) continue ;
-           hJets.ele0Pt->Fill( eP4.Pt() );
-           eleV.push_back( eP4.Pt() ) ;
-           eIdV.push_back( 11.1 + (0.1*i) );
-       }
+       select->GetCollection( "Electron", eleV ) ;
+       for ( size_t k=0; k< eleV.size(); k++ ) eIdV.push_back( 11.1 + 0.1*eleV[k].first ) ; 
+
 
        // 3. photon cuts
-       int nu_Photons = 0 ;
-       int gid = -1 ;
-       double maxPhotonPt = photonCuts[0] ;
-       for ( int i=0 ; i< nPhotons; i++ ) {
-           TLorentzVector phoP4( phoPx[i], phoPy[i], phoPz[i], phoE[i] ) ;
-           if ( phoP4.Pt() < photonCuts[0] || fabs(phoP4.Eta()) > photonCuts[1] ) continue ;
-           if ( phoP4.Pt() > 100. && selectBackground == 2 ) continue ;  // QCD background requirement
-           // check the isolation -- using dR_gj
-           double dR_gj = 999. ;
-           double jpt = 0 ;
-           for ( int j=0 ; j< nJets; j++ ) {
-               TLorentzVector jp4( jetPx[j], jetPy[j], jetPz[j], jetE[j] ) ;
-               if ( jp4.Pt() < jetCuts[0] || fabs(jp4.Eta()) > jetCuts[1] ) continue ;
-               if ( phoP4.DeltaR( jp4 ) < dR_gj ) {
-                  dR_gj  = phoP4.DeltaR( jp4 ) ;
-                  jpt = jp4.Pt() ;
-               }
-           }
-           if ( dR_gj < photonCuts[3] ) continue ;
-
-           // dR_ge 
-           double dR_ge = 999. ;
-           double ept = 0 ;
-           for (size_t k =0 ; k < eleV.size() ; k++) {
-               if ( phoP4.DeltaR( eleV[k] ) < dR_ge )  {
-                  dR_ge = phoP4.DeltaR( eleV[k] ) ;
-                  ept = eleV[k].Pt() ;
-               }
-           }
-           if ( dR_ge < photonCuts[3] ) continue ;
-           hJets.jPt_dR_gj->Fill( jpt, dR_gj ) ;
-           hJets.ePt_dR_ge->Fill( ept, dR_ge ) ;
-
-           gid = ( phoP4.Pt() > maxPhotonPt ) ? i : gid ;
-           nu_Photons++ ;
-       }
-       if ( nu_Photons < photonCuts[4] || gid < 0 ) continue ;
-       //cout<<" EventID : "<< eventId ;
-       //cout<<" Jet size = "<< jetV.size() <<" Photon ID = "<< gid <<endl;
+       select->PhotonFilter(true) ;
+       select->GetCollection( "Photon", phoV ) ;
+       //int gid = ( phoV.size() > 0 ) ? phoV[0].first : -1 ;
+       int nu_Photons = (int) phoV.size() ;
+       if ( nu_Photons < photonCuts[4]  ) continue ;
 
        // event profile
-       TLorentzVector gp4( phoPx[gid], phoPy[gid], phoPz[gid], phoE[gid] ) ;
-       bool isGammaJets = GammaJetsBackground( gp4, jetV ) ;
+       TLorentzVector gp4 = phoV[0].second ;
+       bool isGammaJets = select->GammaJetsBackground() ;
        if ( selectBackground == 1 && !isGammaJets )  continue ;
+
+       double dR_gj = 999. ;
+       double jpt = 0 ;
+       for ( size_t k =0 ; k < jetV.size() ; k++ ) {
+           if ( gp4.DeltaR( jetV[k].second ) < dR_gj )  { 
+              dR_gj = gp4.DeltaR( jetV[k].second ) ;
+              jpt = jetV[k].second.Pt() ;
+           }
+       }
+       hJets.jPt_dR_gj->Fill( jpt, dR_gj ) ;
+
+       double dR_ge = 999. ;
+       double ept = 0 ;
+       for ( size_t k =0 ; k < eleV.size() ; k++ ) {
+           if ( gp4.DeltaR( eleV[k].second ) < dR_ge )  { 
+              dR_ge = gp4.DeltaR( eleV[k].second ) ;
+              ept = eleV[k].second.Pt() ;
+           }
+       }
+       hJets.ePt_dR_ge->Fill( ept, dR_ge ) ;
 
        hJets.pho0Pt->Fill( gp4.Pt() );
        hJets.pho0Eta->Fill( gp4.Eta() );
@@ -213,7 +165,7 @@ void PhotonAna::ReadTree() {
        float ngC = 0. ;
        for ( int x =0; x< nClusters; x++ ) {
            if ( CPIdx[x] < 22. || CPIdx[x] > 23. ) continue ;
-	   float gidx = 22.1 + gid ;
+	   float gidx = 22.1 + 0.1*phoV[0].first ;
            if ( clusterEnergy[x] < BasicClusterCuts[0] )
 	   if ( CPIdx[x] != gidx || fabs(clusterTime[x]) > BasicClusterCuts[1]  ) continue ;
            
@@ -276,7 +228,7 @@ void PhotonAna::ReadTree() {
        float jTime  = 0 ;
        for ( int j=0 ; j< (int)(jetV.size()); j++) {
            if ( k > 2 ) break ; 
-           TLorentzVector jp4( jetV[j].Px(), jetV[j].Py(), jetV[j].Pz(), jetV[j].E() ) ;
+           TLorentzVector jp4( jetV[j].second.Px(), jetV[j].second.Py(), jetV[j].second.Pz(), jetV[j].second.E() ) ;
            //cout<<" jet ("<< jetV[j].Px() <<","<<jetV[j].Py()<<","<<jetV[j].Pz()<<","<< jetV[j].E()<<")" <<endl;
 	   if ( j == 0 ) hJets.jet0Pt->Fill( jp4.Pt() );
 	   if ( j == 0 ) hJets.jet0Eta->Fill( jp4.Eta() );
@@ -299,7 +251,7 @@ void PhotonAna::ReadTree() {
 	       if ( clusterEnergy[x] < BasicClusterCuts[0] ) continue;
 	       if ( CPIdx[x] != jidx  || fabs(clusterTime[x]) > BasicClusterCuts[1] ) continue ;
 
-	       double dRcj = DeltaR( clusterEta[x], clusterPhi[x], jetV[j].Eta(), jetV[j].Phi() ) ;
+	       double dRcj = DeltaR( clusterEta[x], clusterPhi[x], jetV[j].second.Eta(), jetV[j].second.Phi() ) ;
 	       if ( dRcj > BasicClusterCuts[2] ) continue ;
 
 	       //cout<<" BC"<<x<<" CPIdx = "<< CPIdx[x] << " dRcj = "<< dRcj <<endl ;
@@ -325,7 +277,7 @@ void PhotonAna::ReadTree() {
 		   if ( xtalInBCTimeErr[x][y] < 0.2 || xtalInBCTimeErr[x][y] > XtalCuts[1] ) continue ;
                    if ( fabs(xtalInBCEta[x][y])  < 1.479 && xtalOutTimeChi2[x][y] > XtalCuts[2] ) continue ;
                    if ( fabs(xtalInBCEta[x][y]) >= 1.479 && xtalOutTimeChi2[x][y] > XtalCuts[3] ) continue ;
-		   double dRxj = DeltaR( xtalInBCEta[x][y], xtalInBCPhi[x][y] , jetV[j].Eta(), jetV[j].Phi()  ) ;
+		   double dRxj = DeltaR( xtalInBCEta[x][y], xtalInBCPhi[x][y] , jetV[j].second.Eta(), jetV[j].second.Phi()  ) ;
 		   if ( dRxj > XtalCuts[4] ) continue ;
 
 		   xE  += xtalInBCEnergy[x][y] ;
@@ -382,7 +334,7 @@ void PhotonAna::ReadTree() {
        
        //** 3. get the associated bc for electron - a cross check 
        for ( int j=0 ; j< (int)(eleV.size()); j++) {
-           TLorentzVector ep4( eleV[j].Px(), eleV[j].Py(), eleV[j].Pz(), eleV[j].E() ) ;
+           TLorentzVector ep4( eleV[j].second.Px(), eleV[j].second.Py(), eleV[j].second.Pz(), eleV[j].second.E() ) ;
 
            // loop the clusters
 	   float eleadEnergy = 0 ;

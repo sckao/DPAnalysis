@@ -123,15 +123,14 @@ bool Selection::PhotonFilter( bool doIso ) {
            // check the isolation -- using dR_gj
            double dR_gj = 999. ;
            for ( size_t k=0 ; k< jetV.size() ; k++ ) {
-               if ( phoP4.DeltaR( jetV[k] ) < dR_gj )  dR_gj  = phoP4.DeltaR( jetV[k] ) ;
+               if ( phoP4.DeltaR( jetV[k].second ) < dR_gj )  dR_gj  = phoP4.DeltaR( jetV[k].second ) ;
            }
            if ( dR_gj < photonCuts[3] ) continue ;
            
  
-           phoV.push_back( phoP4 );
+           phoV.push_back( make_pair( j , phoP4) );
        }
        if ( (int)phoV.size() < photonCuts[4] ) pass = false ;
-
 
        return pass ;
 }
@@ -153,7 +152,7 @@ bool Selection::VertexFilter() {
      return pass ;
 }
 
-bool Selection::JetMETFilter( ) { 
+bool Selection::JetMETFilter() { 
 
      bool pass =  true ;
      // 1. jet selection
@@ -174,10 +173,10 @@ bool Selection::JetMETFilter( ) {
 
 	 double dR_gj = 999. ;
 	 for ( size_t k=0; k< phoV.size() ; k++) {
-	     if ( phoV[k].DeltaR( jp4 ) < dR_gj )  dR_gj  = phoV[k].DeltaR( jp4 ) ;
+	     if ( phoV[k].second.DeltaR( jp4 ) < dR_gj )  dR_gj  = phoV[k].second.DeltaR( jp4 ) ;
 	 }
 	 if ( dR_gj < photonCuts[3] ) continue ;
-	 jetV.push_back( jp4 );
+	 jetV.push_back( make_pair( j, jp4 ) );
      }
      int nu_Jets = (int)jetV.size() ;
      if ( nu_Jets < jetCuts[2] || nu_Jets > jetCuts[3] )      pass = false ;
@@ -206,11 +205,11 @@ bool Selection::ElectronFilter() {
 
          double dR_ej = 999. ;
          for ( size_t k=0 ; k< jetV.size() ; k++ ) {
-             if ( eP4.DeltaR( jetV[k] ) < dR_ej )  dR_ej  = eP4.DeltaR( jetV[k] ) ;
+             if ( eP4.DeltaR( jetV[k].second ) < dR_ej )  dR_ej  = eP4.DeltaR( jetV[k].second ) ;
          }
          if ( dR_ej < electronCuts[3] ) continue ;
 
-         eleV.push_back( eP4.Pt() ) ;
+         eleV.push_back( make_pair( j, eP4.Pt()) ) ;
      }
      if ( eleV.size() < 1 ) pass = false ;
      return pass = false ;
@@ -230,11 +229,11 @@ bool Selection::MuonFilter() {
 
          double dR_mj = 999. ;
          for ( size_t k=0 ; k< jetV.size() ; k++ ) {
-             if ( mP4.DeltaR( jetV[k] ) < dR_mj )  dR_mj  = mP4.DeltaR( jetV[k] ) ;
+             if ( mP4.DeltaR( jetV[k].second ) < dR_mj )  dR_mj  = mP4.DeltaR( jetV[k].second ) ;
          }
          if ( dR_mj < muonCuts[3] ) continue ;
 
-         muV.push_back( mP4.Pt() ) ;
+         muV.push_back( make_pair( j, mP4.Pt() ) ) ;
      }
      if ( muV.size() < 1 ) pass = false ;
      return pass = false ;
@@ -247,8 +246,8 @@ bool Selection::GammaJetsBackground( ) {
     if ( jetV.size() < 1 ) return false ;
     if ( phoV.size() < 1 ) return false ;
 
-    double dR   = phoV[0].DeltaR( jetV[0] ) ;
-    double ratio1 = jetV[0].Pt() / phoV[0].Pt() ;
+    double dR   = phoV[0].second.DeltaR( jetV[0].second ) ;
+    double ratio1 = jetV[0].second.Pt() / phoV[0].second.Pt() ;
 
     if ( dR <= (2*3.141593/3) )           pass = false ;
     if ( ratio1 >= 1.3 || ratio1 <= 0.7 ) pass = false ;
@@ -291,3 +290,24 @@ void Selection::ResetCuts( string cutName ) {
     if ( cutName == "MuonCuts"     || cutName == "All" ) Input->GetParameters( "MuonCuts",     &muonCuts );
 
 }
+
+void Selection::GetCollection( string collName, vector<objID>& coll ) {
+
+   if ( collName == "Photon" ) {
+      for ( size_t i=0; i< phoV.size() ; i++ ) coll.push_back(  phoV[i] )  ;
+   }
+   else if ( collName == "Jet" ) {
+      for ( size_t i=0; i< jetV.size() ; i++ ) coll.push_back( jetV[i] )  ;
+   }
+   else if ( collName == "Muon" ) {
+      for ( size_t i=0; i< muV.size() ; i++ ) coll.push_back( muV[i] )  ;
+   }
+   else if ( collName == "Electron" ) {
+      for ( size_t i=0; i< eleV.size() ; i++ ) coll.push_back( eleV[i] )  ;
+   }
+   else {
+      cout <<" no collection matched ! " <<endl ;
+   }
+
+}
+

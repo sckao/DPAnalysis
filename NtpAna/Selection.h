@@ -35,6 +35,8 @@
 #define MAXPHO 40
 #define MAXVTX 40
 
+typedef pair<int, TLorentzVector> objID ;
+
 //class Selection : public TObject {
 class Selection {
 
@@ -58,14 +60,16 @@ public:
    void ResetCuts( string cutName, int cutId, double newValue ) ;
    void ResetCuts( string cutName = "All" ) ; // set cuts to default values from datacard 
 
+   void GetCollection( string collName, vector<objID>& coll ) ;
+
 private:
 
    AnaInput*       Input;
 
-   vector<TLorentzVector> phoV ;
-   vector<TLorentzVector> jetV ;
-   vector<TLorentzVector> eleV ;
-   vector<TLorentzVector> muV ;
+   vector<objID> phoV ;
+   vector<objID> jetV ;
+   vector<objID> eleV ;
+   vector<objID> muV ;
 
    vector<double> photonCuts ;
    vector<double> photonIso ;

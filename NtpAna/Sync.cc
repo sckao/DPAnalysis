@@ -64,7 +64,7 @@ void Sync::Init() {
    tr->SetBranchAddress("phoEcalIso",  phoEcalIso );
    tr->SetBranchAddress("phoHcalIso",  phoHcalIso );
    tr->SetBranchAddress("phoTrkIso",   phoTrkIso );
-   tr->SetBranchAddress("phoHovE",   phoHovE );
+   tr->SetBranchAddress("phoHovE",     phoHovE );
    tr->SetBranchAddress("phoSmin",     phoSmin );
    tr->SetBranchAddress("phoSmaj",     phoSmaj );
    tr->SetBranchAddress("phoTime",     phoTime );
@@ -102,6 +102,7 @@ void Sync::ReadTree() {
        bool passEvent = true ;
 
        if ( i%2 == split ) continue ;    
+
        counter[0]++ ;   
        bool passPhoton = select->PhotonFilter( false );
        passEvent = ( passPhoton && passEvent ) ? true : false ;
@@ -128,12 +129,13 @@ void Sync::ReadTree() {
        bool passJet    = select->JetMETFilter();
        passEvent = ( passJet && passEvent ) ? true : false ;
        if ( passEvent ) counter[6]++ ;   
-
+      
        bool passHLT    = select->HLTFilter();
        passEvent = ( passHLT && passEvent ) ? true : false ;
        if ( passEvent ) counter[7]++ ;   
-
+       
        select->ResetCuts() ;
+       select->ResetCollection() ;
 
    } // end of event looping
 

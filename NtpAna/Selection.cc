@@ -39,6 +39,7 @@ void Selection::Init( TTree* tr ) {
    tr->SetBranchAddress("nPhotons",   &nPhotons);
    tr->SetBranchAddress("nElectrons", &nElectrons);
    tr->SetBranchAddress("nVertices",  &nVertices );
+
    tr->SetBranchAddress("metPx",      &metPx );
    tr->SetBranchAddress("metPy",      &metPy );
    tr->SetBranchAddress("met",        &metE );
@@ -117,9 +118,10 @@ bool Selection::PhotonFilter( bool doIso ) {
            // Isolation
            if ( doIso ) {
               if ( phoTrkIso[j] / phoP4.Pt()  >= photonIso[0] )                                continue ;
-              if ( phoEcalIso[j] >= photonIso[1] && phoEcalIso[j] / phoE[j] >= photonIso[2] )  continue ;
-              if ( phoHcalIso[j] >= photonIso[3] && phoHcalIso[j] / phoE[j] >= photonIso[4] )  continue ;
+              if ( phoEcalIso[j] >= photonIso[1] || phoEcalIso[j] / phoE[j] >= photonIso[2] )  continue ;
+              if ( phoHcalIso[j] >= photonIso[3] || phoHcalIso[j] / phoE[j] >= photonIso[4] )  continue ;
            }
+
            // check the isolation -- using dR_gj
            double dR_gj = 999. ;
            for ( size_t k=0 ; k< jetV.size() ; k++ ) {
@@ -177,14 +179,15 @@ bool Selection::JetMETFilter() {
 	 }
 	 if ( dR_gj < photonCuts[3] ) continue ;
 	 jetV.push_back( make_pair( j, jp4 ) );
+
      }
      int nu_Jets = (int)jetV.size() ;
      if ( nu_Jets < jetCuts[2] || nu_Jets > jetCuts[3] )      pass = false ;
 
      // 2. met selection
      TLorentzVector metp4( metPx, metPy, 0., metE ) ;
-     if ( jetCuts[4] > 0 &&  metp4.Et() < jetCuts[4] )         pass = false ;
-     if ( jetCuts[4] < 0 &&  metp4.Et() > fabs( jetCuts[4] ) ) pass = false ;
+     if ( jetCuts[4] >= 0 &&  metp4.Et() < jetCuts[4] )         pass = false ;
+     if ( jetCuts[4]  < 0 &&  metp4.Et() > fabs( jetCuts[4] ) ) pass = false ;
  
      return pass ;
 }
@@ -288,6 +291,15 @@ void Selection::ResetCuts( string cutName ) {
     if ( cutName == "ElectronCuts" || cutName == "All" ) Input->GetParameters( "ElectronCuts", &electronCuts );
     if ( cutName == "JetCuts"      || cutName == "All" ) Input->GetParameters( "JetCuts",      &jetCuts );
     if ( cutName == "MuonCuts"     || cutName == "All" ) Input->GetParameters( "MuonCuts",     &muonCuts );
+
+}
+
+void Selection::ResetCollection( string cutName ) {
+
+    if ( cutName == "Photon"   || cutName == "All" ) phoV.clear() ;
+    if ( cutName == "Electron" || cutName == "All" ) eleV.clear() ;
+    if ( cutName == "Jet"      || cutName == "All" ) jetV.clear() ;
+    if ( cutName == "Muon"     || cutName == "All" ) muV.clear() ;
 
 }
 

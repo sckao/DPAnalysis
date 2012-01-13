@@ -61,6 +61,7 @@ public:
    void ResetCuts( string cutName = "All" ) ; // set cuts to default values from datacard 
 
    void GetCollection( string collName, vector<objID>& coll ) ;
+   void ResetCollection( string cutName = "All" ) ; // clean the storage containers 
 
 private:
 

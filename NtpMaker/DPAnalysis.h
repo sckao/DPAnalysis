@@ -72,12 +72,12 @@
 
 // PU SummeryInfo
 #include "SimDataFormats/PileupSummaryInfo/interface/PileupSummaryInfo.h" 
-
-
-#include "Ntuple.h"
 #include <TMath.h>
 #include "TFile.h"
 #include "TTree.h"
+
+#include "Ntuple.h"
+#include "GenStudy.h"
 
 #include <Math/VectorUtil.h>
 
@@ -126,6 +126,8 @@ class DPAnalysis : public edm::EDAnalyzer {
       TTree *theTree;
 
       TFile *theFile;
+
+      GenStudy *gen ; 
       /*
       virtual void beginJob() ;
       virtual void analyze(const edm::Event&, const edm::EventSetup&);
@@ -140,6 +142,7 @@ class DPAnalysis : public edm::EDAnalyzer {
       // ----------member data ---------------------------
       string rootFileName;
       string triggerName ;
+      bool isData ;
 
       edm::InputTag trigSource;
       edm::InputTag pvSource;

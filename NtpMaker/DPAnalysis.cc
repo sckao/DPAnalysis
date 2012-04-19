@@ -55,10 +55,13 @@ DPAnalysis::DPAnalysis(const edm::ParameterSet& iConfig){
    electronCuts         = iConfig.getParameter<std::vector<double> >("electronCuts");
    muonCuts             = iConfig.getParameter<std::vector<double> >("muonCuts");  
    triggerName          = iConfig.getUntrackedParameter<string> ("triggerName");
+   isData               = iConfig.getUntrackedParameter<bool> ("isData");
+
+   gen = new GenStudy( iConfig );
 
    theFile  = new TFile( rootFileName.c_str(), "RECREATE") ;
    theFile->cd () ;
-   theTree  = new TTree ( "EcalTimeAnalysis","EcalTimeAnalysis" ) ;
+   theTree  = new TTree ( "DPAnalysis","DPAnalysis" ) ;
    setBranches( theTree, leaves ) ;
 
    // reset the counter
@@ -71,6 +74,7 @@ DPAnalysis::~DPAnalysis()
 {
    // do anything here that needs to be done at desctruction time
 
+   delete gen ;
    cout<<"All:"<< counter[0]<<" dumper:"<<counter[1]<<" Vertex:"<< counter[2] <<" photon:"<<counter[3] ;
    cout<<" sMinor:"<< counter[4] <<" BeamHalo:"<< counter[5] <<" Iso:"<<counter[6] <<" GJet:"<<counter[7] ;
    cout<<" Jets:"<< counter[8] << " G100:"<< counter[9] <<endl;
@@ -108,6 +112,8 @@ void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
 
    counter[0]++ ;  
    int trigVal = TriggerSelection( iEvent, 65 ) ;
+
+   if ( isData ) gen->GetGen( iEvent, leaves );
 
    bool pass = EventSelection( iEvent ) ;
    /*

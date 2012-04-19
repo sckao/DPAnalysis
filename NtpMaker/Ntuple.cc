@@ -15,6 +15,7 @@ void setBranchAddresses(TTree* chain, Ntuple& treeVars)
   chain -> SetBranchAddress("nJets",       &treeVars.nJets      );
   chain -> SetBranchAddress("nPhotons",    &treeVars.nPhotons   );
   chain -> SetBranchAddress("nVertices",   &treeVars.nVertices  );
+  chain -> SetBranchAddress("nGen",        &treeVars.nGen       );
 
   chain -> SetBranchAddress("metPx",       &treeVars.metPx     );
   chain -> SetBranchAddress("metPy",       &treeVars.metPy     );
@@ -68,6 +69,17 @@ void setBranchAddresses(TTree* chain, Ntuple& treeVars)
   chain -> SetBranchAddress("sMinPho",      treeVars.sMinPho ) ;
   chain -> SetBranchAddress("sMajPho",      treeVars.sMajPho ) ;
 
+  chain -> SetBranchAddress("genPx",        treeVars.genPx       );
+  chain -> SetBranchAddress("genPy",        treeVars.genPy       );
+  chain -> SetBranchAddress("genPz",        treeVars.genPz       );
+  chain -> SetBranchAddress("genE",         treeVars.genE        );
+  chain -> SetBranchAddress("genVx",        treeVars.genVx       );
+  chain -> SetBranchAddress("genVy",        treeVars.genVy       );
+  chain -> SetBranchAddress("genVz",        treeVars.genVz       );
+  chain -> SetBranchAddress("genT",         treeVars.genT        );
+  chain -> SetBranchAddress("pdgId",        treeVars.pdgId       );
+  chain -> SetBranchAddress("momId",        treeVars.momId       );
+  
 }
 
 
@@ -86,6 +98,7 @@ void setBranches(TTree* chain, Ntuple& treeVars)
   chain -> Branch("nJets",       &treeVars.nJets,                "nJets/I");
   chain -> Branch("nPhotons",    &treeVars.nPhotons,             "nPhotons/I");
   chain -> Branch("nVertices",   &treeVars.nVertices,            "nVertices/I");
+  chain -> Branch("nGen",        &treeVars.nGen,                 "nGen/I");
 
   chain -> Branch("metPx",       &treeVars.metPx,                "metPx/F");
   chain -> Branch("metPy",       &treeVars.metPy,                "metPy/F");
@@ -138,6 +151,17 @@ void setBranches(TTree* chain, Ntuple& treeVars)
   chain -> Branch("vtxDy",            treeVars.vtxDy,        "vtxDy[nVertices]/F");
   chain -> Branch("vtxDz",            treeVars.vtxDz,        "vtxDz[nVertices]/F");
   
+  chain -> Branch("pdgId",        treeVars.pdgId,                 "pdgId[nGen]/I");
+  chain -> Branch("momId",        treeVars.momId,                 "momId[nGen]/I");
+  chain -> Branch("genPx",        treeVars.genPx,                 "genPx[nGen]/F");
+  chain -> Branch("genPy",        treeVars.genPy,                 "genPy[nGen]/F");
+  chain -> Branch("genPz",        treeVars.genPz,                 "genPz[nGen]/F");
+  chain -> Branch("genE",         treeVars.genE,                  "genE[nGen]/F");
+  chain -> Branch("genVx",        treeVars.genVx,                 "genVx[nGen]/F");
+  chain -> Branch("genVy",        treeVars.genVy,                 "genVy[nGen]/F");
+  chain -> Branch("genVz",        treeVars.genVz,                 "genVz[nGen]/F");
+  chain -> Branch("genT",         treeVars.genT,                  "genT[nGen]/F");
+  
 }
 
 
@@ -155,6 +179,7 @@ void initializeBranches(TTree* chain, Ntuple& treeVars)
   treeVars.nMuons     = 0 ; 
   treeVars.nPhotons   = 0 ; 
   treeVars.nVertices  = 0;
+  treeVars.nGen       = 0 ; 
 
   treeVars.metPx = 0 ;
   treeVars.metPy = 0 ;
@@ -212,5 +237,16 @@ void initializeBranches(TTree* chain, Ntuple& treeVars)
       treeVars.vtxDy[i]=0;
       treeVars.vtxDz[i]=0;
   }
-
+  for ( int i=0; i< MAXGEN; i++) {
+      treeVars.pdgId[i] = 0 ;
+      treeVars.momId[i] = 0 ;
+      treeVars.genPx[i] = 0 ;
+      treeVars.genPy[i] = 0 ;
+      treeVars.genPz[i] = 0 ;
+      treeVars.genE[i] = 0 ;
+      treeVars.genVx[i] = 0 ;
+      treeVars.genVy[i] = 0 ;
+      treeVars.genVz[i] = 0 ;
+      treeVars.genT[i] = 0 ;
+  }
 }

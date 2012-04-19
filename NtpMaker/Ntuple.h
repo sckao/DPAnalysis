@@ -8,7 +8,7 @@
 #define MAXPHO 10
 #define MAXMU 5
 #define MAXELE 5
-
+#define MAXGEN 20
 
 struct Ntuple
 {
@@ -77,6 +77,19 @@ struct Ntuple
   float phoTime[MAXPHO];
   float sMinPho[MAXPHO];
   float sMajPho[MAXPHO];
+
+  // Gen Particle information
+  int nGen ; 
+  int pdgId[MAXGEN] ;
+  int momId[MAXGEN] ;
+  float genPx[MAXGEN] ; 
+  float genPy[MAXGEN] ; 
+  float genPz[MAXGEN] ; 
+  float genE[MAXGEN] ; 
+  float genVx[MAXGEN] ; 
+  float genVy[MAXGEN] ; 
+  float genVz[MAXGEN] ; 
+  float genT[MAXGEN] ; 
 
 };
 

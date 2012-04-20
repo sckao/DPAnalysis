@@ -71,7 +71,8 @@
 #include <algorithm>
 
 // PU SummeryInfo
-#include "SimDataFormats/PileupSummaryInfo/interface/PileupSummaryInfo.h" 
+//#include "SimDataFormats/PileupSummaryInfo/interface/PileupSummaryInfo.h" 
+
 #include <TMath.h>
 #include "TFile.h"
 #include "TTree.h"
@@ -126,18 +127,7 @@ class DPAnalysis : public edm::EDAnalyzer {
       TTree *theTree;
 
       TFile *theFile;
-
       GenStudy *gen ; 
-      /*
-      virtual void beginJob() ;
-      virtual void analyze(const edm::Event&, const edm::EventSetup&);
-      virtual void endJob() ;
-
-      virtual void beginRun(edm::Run const&, edm::EventSetup const&);
-      virtual void endRun(edm::Run const&, edm::EventSetup const&);
-      virtual void beginLuminosityBlock(edm::LuminosityBlock const&, edm::EventSetup const&);
-      virtual void endLuminosityBlock(edm::LuminosityBlock const&, edm::EventSetup const&);
-      */
 
       // ----------member data ---------------------------
       string rootFileName;
@@ -155,7 +145,7 @@ class DPAnalysis : public edm::EDAnalyzer {
 
       edm::InputTag EBRecHitCollection;
       edm::InputTag EERecHitCollection;
-      edm::InputTag pileupSource ;
+      //edm::InputTag pileupSource ;
 
       std::vector<double> muonCuts ;
       std::vector<double> electronCuts ;
@@ -171,10 +161,9 @@ class DPAnalysis : public edm::EDAnalyzer {
       std::vector<const reco::Photon*> selectedPhotons ;
 
       bool passEvent ;
-
       int counter[10] ; 
-      
       float sMin_ ;
+
 };
 
 #endif

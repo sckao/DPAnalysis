@@ -45,7 +45,7 @@ DPAnalysis::DPAnalysis(const edm::ParameterSet& iConfig){
    EBRecHitCollection   = iConfig.getParameter<edm::InputTag> ("EBRecHitCollection") ;
    EERecHitCollection   = iConfig.getParameter<edm::InputTag> ("EERecHitCollection") ;
  
-   pileupSource         = iConfig.getParameter<edm::InputTag>("addPileupInfo");
+   //pileupSource         = iConfig.getParameter<edm::InputTag>("addPileupInfo");
 
    vtxCuts              = iConfig.getParameter<std::vector<double> >("vtxCuts");
    jetCuts              = iConfig.getParameter<std::vector<double> >("jetCuts");
@@ -100,13 +100,14 @@ void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
    leaves.runId       = iEvent.id ().run () ;
    leaves.eventId     = iEvent.id ().event () ;
 
+  /* 
    Handle<std::vector< PileupSummaryInfo > >  PupInfo;
    iEvent.getByLabel(pileupSource, PupInfo);
 
    for( std::vector<PileupSummaryInfo>::const_iterator PVI = PupInfo->begin(); PVI != PupInfo->end(); ++PVI) {
        std::cout << " Pileup Information: bunchXing, nvtx: " << PVI->getBunchCrossing() << " " << PVI->getPU_NumInteractions() << std::endl;
    }
-
+   */
 
    if (counter[0] <= 1 )  PrintTriggers( iEvent ) ;
 

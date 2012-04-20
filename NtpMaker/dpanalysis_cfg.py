@@ -27,6 +27,8 @@ process.demo = cms.EDAnalyzer('DPAnalysis'
     beamSpotSource   = cms.InputTag("offlineBeamSpot"),
     EBRecHitCollection = cms.InputTag("reducedEcalRecHitsEB"),
     EERecHitCollection = cms.InputTag("reducedEcalRecHitsEE"),
+    tau                = cms.double( 1000 ) 
+
     # Set up cuts for physics objects
     # vertex cuts                z   ndof   d0 
     vtxCuts       = cms.vdouble( 99,    0,  99 ),

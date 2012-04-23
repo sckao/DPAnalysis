@@ -112,25 +112,13 @@ void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
    if (counter[0] <= 1 )  PrintTriggers( iEvent ) ;
 
    counter[0]++ ;  
-   int trigVal = TriggerSelection( iEvent, 65 ) ;
+   TriggerSelection( iEvent, 65 ) ;
 
-   if ( isData ) gen->GetGen( iEvent, leaves );
+   if ( !isData ) gen->GetGen( iEvent, leaves );
 
    bool pass = EventSelection( iEvent ) ;
-   /*
-   if ( pass ) {
-      if ( triggered ) {
-          counter[1]++ ; 
-      }
-   }
-   if ( pass ) {
-      leaves.runId = iEvent.id().run() ;
-      leaves.eventId = iEvent.id().event() ;
-   }
-   */
 
-   theTree->Fill();
-   //PrintTriggers( iEvent ) ;
+   if ( pass ) theTree->Fill();
 }
 
 bool DPAnalysis::EventSelection(const edm::Event& iEvent ) {
@@ -157,62 +145,8 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent ) {
    iEvent.getByLabel( EERecHitCollection,     recHitsEE );
    iEvent.getByLabel("BeamHaloSummary", beamHaloSummary) ;
 
-   //passEvent = true ;
-   unsigned int alist[3] = { 323077486, 323288514, 323780661 } ;
-
-   bool getit = false ;
-   for ( int i=0; i <3 ; i++ )    if (  iEvent.id().event() == alist[i]  ) getit = true ;
-
    bool passEvent = true ;
 
-   int nPhoton = 0 ;
-   int nPhotonl = 0 ;
-   int k =0 ;
-   for(reco::PhotonCollection::const_iterator it = photons->begin(); it != photons->end(); it++) {
-      if ( it->energy() >= 3. ) nPhoton++ ;
-      if ( it->energy()  < 3. ) nPhotonl++ ;
-
-      // S_Minor Cuts from the seed cluster
-      reco::CaloClusterPtr SCseed = it->superCluster()->seed() ;
-      const EcalRecHitCollection* rechits = ( it->isEB()) ? recHitsEB.product() : recHitsEE.product() ;
-      //const EBRecHitCollection* rechits = ( it->isEB()) ? recHitsEB.product() : recHitsEE.product() ;
-
-      Cluster2ndMoments moments = EcalClusterTools::cluster2ndMoments(*SCseed, *rechits);
-      float sMin =  moments.sMin  ;
-      float sMaj =  moments.sMaj  ;
-
-      // seed Time 
-      pair<DetId, float> maxRH = EcalClusterTools::getMaximum( *SCseed, rechits );
-      DetId seedCrystalId = maxRH.first;
-      EcalRecHitCollection::const_iterator seedRH = rechits->find(seedCrystalId);
-      float seedTime = (float)seedRH->time();
-
-      float ecalSumEt = it->ecalRecHitSumEtConeDR04();
-      float hcalSumEt = it->hcalTowerSumEtConeDR04();
-      float trkSumPt  = it->trkSumPtSolidConeDR04();  
-
-      if ( getit ) printf(" pt%d:%3.3f, h:%2.2f sMin:%3.3f \n", k, it->pt(), it->eta(), sMin ) ;
-
-       leaves.phoPx[k] = it->p4().Px() ;
-       leaves.phoPy[k] = it->p4().Py() ;
-       leaves.phoPz[k] = it->p4().Pz() ;
-       leaves.phoE[k]  = it->p4().E() ;
-       leaves.phoHoverE[k]  = it->hadronicOverEm() ;
-       leaves.phoEcalIso[k] = ecalSumEt ;
-       leaves.phoHcalIso[k] = hcalSumEt ;
-       leaves.phoTrkIso[k]  = trkSumPt ;
-
-       leaves.sMinPho[k] = sMin ;
-       leaves.sMajPho[k] = sMaj ;
-       leaves.phoTime[k] = seedTime ;
-
-      k++ ;
-   }
-   leaves.nPhotons = k ;
-   if (getit ) cout<<" -------------------- "<<endl;
-   //if ( nPhotonl > 20 || nPhoton > 20 ) cout<<" nPhotons = "<< nPhoton <<" nPhotonL : "<< nPhotonl << endl;
-
-   if ( nPhoton >= 40 ) passEvent = false ;
    if ( passEvent )   counter[1]++ ;  
 
    bool hasGoodVtx = VertexSelection( recVtxs );
@@ -220,7 +154,7 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent ) {
    if ( passEvent )   counter[2]++ ;  
 
    selectedPhotons.clear() ;
-   PhotonSelection( photons, selectedPhotons ) ;
+   PhotonSelection( photons, recHitsEB, recHitsEE, selectedPhotons ) ;
    if ( selectedPhotons.size() < (size_t)photonCuts[5] )  passEvent = false ;
    if ( passEvent )   counter[3]++ ;  
 
@@ -331,7 +265,6 @@ int DPAnalysis::TriggerSelection( const edm::Event& iEvent, int cutVal, string s
        }
    } 
    return trgResult ;
-
 }
 
 void DPAnalysis::PrintTriggers( const edm::Event& iEvent ) {
@@ -381,41 +314,61 @@ bool DPAnalysis::VertexSelection( Handle<reco::VertexCollection> vtx ) {
      return hasGoodVertex ;
 }
 
-bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, vector<const reco::Photon*>& selectedPhotons ) {
+bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle<EcalRecHitCollection> recHitsEB, Handle<EcalRecHitCollection> recHitsEE, vector<const reco::Photon*>& selectedPhotons ) {
 
-   float gidx = 22.0 ;
    int k= 0 ;
    for(reco::PhotonCollection::const_iterator it = photons->begin(); it != photons->end(); it++) {
        // fiducial cuts
+       if ( k >= MAXPHO ) break ;
        if ( it->pt() < photonCuts[0] || fabs( it->eta() ) > photonCuts[1] ) continue ;
        float hcalIsoRatio = it->hcalTowerSumEtConeDR04() / it->pt() ;
        if  ( ( hcalIsoRatio + it->hadronicOverEm() )*it->energy() >= 6.0 ) continue ;
  
+       // S_Minor Cuts from the seed cluster
+       reco::CaloClusterPtr SCseed = it->superCluster()->seed() ;
+       const EcalRecHitCollection* rechits = ( it->isEB()) ? recHitsEB.product() : recHitsEE.product() ;
+       //const EBRecHitCollection* rechits = ( it->isEB()) ? recHitsEB.product() : recHitsEE.product() ;
+
+       Cluster2ndMoments moments = EcalClusterTools::cluster2ndMoments(*SCseed, *rechits);
+       float sMin =  moments.sMin  ;
+       float sMaj =  moments.sMaj  ;
+
+       // seed Time 
+       pair<DetId, float> maxRH = EcalClusterTools::getMaximum( *SCseed, rechits );
+       DetId seedCrystalId = maxRH.first;
+       EcalRecHitCollection::const_iterator seedRH = rechits->find(seedCrystalId);
+       float seedTime = (float)seedRH->time();
+      
+       if ( sMaj > photonCuts[2] ) continue ;
+       if ( sMin <= photonCuts[3] || sMin >= photonCuts[4] ) continue ;
+
        // Isolation Cuts 
        float ecalSumEt = it->ecalRecHitSumEtConeDR04();
        float hcalSumEt = it->hcalTowerSumEtConeDR04();
        float trkSumPt  = it->trkSumPtSolidConeDR04();  
-       /*
+
        bool trkIso  = ( ( trkSumPt / it->pt())     < photonIso[0] ) ; 
        bool ecalIso = ( (ecalSumEt / it->energy()) < photonIso[2] && ecalSumEt < photonIso[1] ) ; 
        bool hcalIso = ( (hcalSumEt / it->energy()) < photonIso[4] && hcalSumEt < photonIso[3] ) ; 
        if ( !trkIso || !ecalIso || !hcalIso ) continue ;
-       */  
-       // dR cuts 
-       /*  
-       double dR = 999 ;
-       for (size_t j=0; j < selectedJets.size(); j++ ) {
-           double dR_ =  ROOT::Math::VectorUtil::DeltaR( it->p4(), selectedJets[j]->p4() ) ;
-           if ( dR_ < dR ) dR = dR_ ;
-       }
-       if ( dR <= photonCuts[2] ) continue ;
-       */ 
-       if ( k >= MAXPHO ) break ;
-       gidx += 0.1 ;
-       //if ( !it->superCluster().isNull() ) sclist.push_back( make_pair(it->superCluster(), gidx ) );
+
+       leaves.phoPx[k] = it->p4().Px() ;
+       leaves.phoPy[k] = it->p4().Py() ;
+       leaves.phoPz[k] = it->p4().Pz() ;
+       leaves.phoE[k]  = it->p4().E() ;
+       leaves.phoHoverE[k]  = it->hadronicOverEm() ;
+       leaves.phoEcalIso[k] = ecalSumEt ;
+       leaves.phoHcalIso[k] = hcalSumEt ;
+       leaves.phoTrkIso[k]  = trkSumPt ;
+
+       leaves.sMinPho[k] = sMin ;
+       leaves.sMajPho[k] = sMaj ;
+       leaves.phoTime[k] = seedTime ;
+
        selectedPhotons.push_back( &(*it) ) ;
        k++ ;
    }
+   leaves.nPhotons = k ;
    //leaves.nPhotons = (int)( selectedPhotons.size() ) ;
 
    if ( selectedPhotons.size() > 0 )  return true ; 
@@ -447,7 +400,7 @@ bool DPAnalysis::JetSelection( Handle<reco::PFJetCollection> jets, vector<const 
            double dR_ =  ROOT::Math::VectorUtil::DeltaR( it->p4(), selectedPhotons[j]->p4() ) ;
            if ( dR_ < dR ) dR = dR_ ;
        }
-       if ( dR <= photonCuts[2] ) continue ;
+       if ( dR <= jetCuts[2] ) continue ;
 
        if ( k >= MAXJET ) break ;
        selectedJets.push_back( &(*it) ) ;
@@ -565,7 +518,7 @@ bool DPAnalysis::sMinorSelection( vector<const reco::Photon*>& selectedPhotons, 
         const EcalRecHitCollection* rechits = ( selectedPhotons[i]->isEB()) ? recHitsEB.product() : recHitsEE.product() ;
         Cluster2ndMoments moments = EcalClusterTools::cluster2ndMoments(*SCseed, *rechits);
         float sMin =  moments.sMin  ;
-        float sMaj =  moments.sMaj  ;
+        //float sMaj =  moments.sMaj  ;
 
         // seed Time 
         pair<DetId, float> maxRH = EcalClusterTools::getMaximum( *SCseed, rechits );

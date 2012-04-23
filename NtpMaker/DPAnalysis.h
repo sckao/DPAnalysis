@@ -104,7 +104,7 @@ class DPAnalysis : public edm::EDAnalyzer {
  
       bool VertexSelection( edm::Handle<reco::VertexCollection> vtx ) ;
 
-      bool PhotonSelection(  edm::Handle<reco::PhotonCollection> photons,vector<const reco::Photon*>& selectedPhotons ) ;
+      bool PhotonSelection(  edm::Handle<reco::PhotonCollection> photons, edm::Handle<EcalRecHitCollection> recHitsEB, edm::Handle<EcalRecHitCollection> recHitsEE, vector<const reco::Photon*>& selectedPhotons ) ;
 
       bool JetSelection( edm::Handle<reco::PFJetCollection> jets, vector<const reco::Photon*>& selectedPhotons,
                                                                      vector<const reco::PFJet*>& selectedJets ) ;

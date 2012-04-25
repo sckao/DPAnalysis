@@ -54,7 +54,7 @@ DPAnalysis::DPAnalysis(const edm::ParameterSet& iConfig){
    photonIso            = iConfig.getParameter<std::vector<double> >("photonIso");
    electronCuts         = iConfig.getParameter<std::vector<double> >("electronCuts");
    muonCuts             = iConfig.getParameter<std::vector<double> >("muonCuts");  
-   triggerName          = iConfig.getUntrackedParameter<string> ("triggerName");
+   triggerPatent        = iConfig.getUntrackedParameter<string> ("triggerName");
    isData               = iConfig.getUntrackedParameter<bool> ("isData");
 
    gen = new GenStudy( iConfig );
@@ -64,6 +64,7 @@ DPAnalysis::DPAnalysis(const edm::ParameterSet& iConfig){
    theTree  = new TTree ( "DPAnalysis","DPAnalysis" ) ;
    setBranches( theTree, leaves ) ;
 
+   TriggerName = "" ;
    // reset the counter
    for ( int i=0; i< 10 ; i++) counter[i] = 0 ;
 
@@ -109,16 +110,16 @@ void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
    }
    */
 
-   if (counter[0] <= 1 )  PrintTriggers( iEvent ) ;
+   if (counter[0] == 0 )  PrintTriggers( iEvent ) ;
 
    counter[0]++ ;  
-   TriggerSelection( iEvent, 65 ) ;
+   bool passTrigger = TriggerSelection( iEvent ) ;
 
    if ( !isData ) gen->GetGen( iEvent, leaves );
 
    bool pass = EventSelection( iEvent ) ;
 
-   if ( pass ) theTree->Fill();
+   if ( pass && passTrigger ) theTree->Fill();
 }
 
 bool DPAnalysis::EventSelection(const edm::Event& iEvent ) {
@@ -148,7 +149,6 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent ) {
    bool passEvent = true ;
 
    if ( passEvent )   counter[1]++ ;  
-
    bool hasGoodVtx = VertexSelection( recVtxs );
    if ( !hasGoodVtx ) passEvent = false ;
    if ( passEvent )   counter[2]++ ;  
@@ -158,8 +158,8 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent ) {
    if ( selectedPhotons.size() < (size_t)photonCuts[5] )  passEvent = false ;
    if ( passEvent )   counter[3]++ ;  
 
-   sMinorSelection( selectedPhotons, recHitsEB, recHitsEE ) ;
-   if ( selectedPhotons.size() < (size_t)photonCuts[5] )  passEvent = false ;
+   //sMinorSelection( selectedPhotons, recHitsEB, recHitsEE ) ;
+   //if ( selectedPhotons.size() < (size_t)photonCuts[5] )  passEvent = false ;
    /*
    if ( passEvent ) {  counter[4]++ ;  
                        printf("id:%d, nPho:%d, Pt:%.3f sMin:%.6f \n", 
@@ -177,31 +177,25 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent ) {
        counter[5]++ ;
    }
  
-   IsoPhotonSelection( selectedPhotons ) ;
-   if ( selectedPhotons.size() < photonCuts[5] )  passEvent = false ;
+   //IsoPhotonSelection( selectedPhotons ) ;
+   //if ( selectedPhotons.size() < photonCuts[5] )  passEvent = false ;
    if ( passEvent )   counter[6]++ ;  
 
    selectedJets.clear() ;
    JetSelection( jets, selectedPhotons, selectedJets );
-   bool isGammaJets = GammaJetVeto( selectedPhotons, selectedJets ) ;
-
-   if ( isGammaJets ) passEvent = false ;
+   //bool isGammaJets = GammaJetVeto( selectedPhotons, selectedJets ) ;
+   //if ( isGammaJets ) passEvent = false ;
    if ( passEvent )   counter[7]++ ;   
-   if ( selectedJets.size() < jetCuts[2] )   passEvent = false ;
+   if ( selectedJets.size() < jetCuts[3] )   passEvent = false ;
    if ( passEvent )   counter[8]++ ;  
 
-   if ( selectedPhotons.size() > 0 ) {
-      if ( selectedPhotons[0]->pt() < 100. ) passEvent = false ;
-   }
-   if ( passEvent ) counter[9]++ ; 
-
-   /*
+   
    selectedElectrons.clear() ;
-   if ( electronCuts[0] == 1 ) ElectronSelection( electrons, selectedElectrons ) ;
+   ElectronSelection( electrons, selectedElectrons ) ;
 
    selectedMuons.clear() ;
-   if ( muonCuts[0] == 1 )MuonSelection( muons, selectedMuons );
-   */
+   MuonSelection( muons, selectedMuons );
+   
    const reco::PFMET pfMet = (*met)[0] ;
    leaves.met   = pfMet.et() ;
    leaves.metPx = pfMet.px() ;
@@ -213,12 +207,38 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent ) {
 
 bool DPAnalysis::TriggerSelection( const edm::Event& iEvent ) {
 
+   bool pass =false ;
+   Handle<edm::TriggerResults> triggers;
+   iEvent.getByLabel( trigSource, triggers );
+   const edm::TriggerNames& trgNameList = iEvent.triggerNames( *triggers );
+
+   if ( TriggerName.size() == 0 ) { 
+      for ( size_t i =0 ; i < trgNameList.size(); i++ ) {
+          string tName  = trgNameList.triggerName( i );
+          if ( strncmp( tName.c_str(), triggerPatent.c_str(), triggerPatent.size() ) ==0 ) {
+             TriggerName = tName ; 
+             cout<<" Trigger Found : "<< tName <<" accepted ? "<< triggers->accept(i) <<endl;
+             pass = ( triggers->accept(i) == 1 ) ? true : false ;
+          }
+      }
+   } else {
+
+          int trgIndex  = trgNameList.triggerIndex( TriggerName );
+          pass = ( triggers->accept(trgIndex) == 1 ) ? true : false ;
+          //if ( pass ) cout<<" Trigger Found : "<< TriggerName  << endl; 
+   } 
+
+   return pass ;
+}
+/*
+bool DPAnalysis::TriggerSelection( const edm::Event& iEvent ) {
+
    Handle<edm::TriggerResults> triggers;
    iEvent.getByLabel( trigSource, triggers );
 
    const edm::TriggerNames& trgNames = iEvent.triggerNames( *triggers );
 
-   int trgIndex  = trgNames.triggerIndex(triggerName);
+   int trgIndex  = trgNames.triggerIndex(triggerPatent);
    int trgResult = 0;
    if ( trgIndex == (int)(trgNames.size()) ) {
           cout<<" NO Matched Trigger -- Turn TriggerSelection Off "<<endl;
@@ -232,7 +252,7 @@ bool DPAnalysis::TriggerSelection( const edm::Event& iEvent ) {
    bool pass =  ( trgResult == 1 ) ? true : false ;
    return pass ;
 }
-
+*/
 int DPAnalysis::TriggerSelection( const edm::Event& iEvent, int cutVal, string str_head, string str_body ) {
 
    Handle<edm::TriggerResults> triggers;
@@ -280,6 +300,9 @@ void DPAnalysis::PrintTriggers( const edm::Event& iEvent ) {
        int trgIndex  = trgNames.triggerIndex(tName);
        int trgResult = triggers->accept(trgIndex);
        cout<<" name: "<< tName <<"  idx:"<< trgIndex <<"  accept:"<< trgResult <<endl;
+       if ( strncmp( tName.c_str(), triggerPatent.c_str(), triggerPatent.size() ) ==0 ) {
+          TriggerName = tName ;
+       }
        //string triggered = triggers->accept(i) ? "Yes" : "No" ;
        //cout<<" path("<<i<<") accepted ? "<< triggered ;
    }
@@ -427,22 +450,21 @@ bool DPAnalysis::ElectronSelection( Handle<reco::GsfElectronCollection> electron
 
    // Electron Identification Based on Simple Cuts
    // https://twiki.cern.ch/twiki/bin/view/CMS/SimpleCutBasedEleID#Selections_and_How_to_use_them
-
    float eidx = 11. ;
    int k = 0 ;
    for(reco::GsfElectronCollection::const_iterator it = electrons->begin(); it != electrons->end(); it++) {
-       if ( it->pt() < electronCuts[1] || fabs( it->eta() ) > electronCuts[2] ) continue ;
+       if ( it->pt() < electronCuts[0] || fabs( it->eta() ) > electronCuts[1] ) continue ;
        // Isolation Cuts
        float ecalSumEt = ( it->isEB() ) ? max(0., it->dr03EcalRecHitSumEt() - 1. ) : it->dr03EcalRecHitSumEt();
        float hcalSumEt = it->dr03HcalTowerSumEt();
        float trkSumPt  = it->dr03TkSumPt();  
        double relIso   = (ecalSumEt + hcalSumEt + trkSumPt) / it->pt() ;
 
-       if ( relIso > electronCuts[3] &&  it->isEB() ) continue ;
-       if ( relIso > electronCuts[4] && !it->isEB() ) continue ;
+       if ( relIso > electronCuts[2] &&  it->isEB() ) continue ;
+       if ( relIso > electronCuts[3] && !it->isEB() ) continue ;
 
        double nLost = it->gsfTrack()->trackerExpectedHitsInner().numberOfLostHits() ;
-       if ( nLost >= electronCuts[5]  ) continue ;
+       if ( nLost >= electronCuts[4]  ) continue ;
        eidx += 0.1 ;
        //if ( !it->superCluster().isNull() ) sclist.push_back( make_pair(it->superCluster(), eidx ) );
        if ( k >= MAXELE ) break ;
@@ -466,10 +488,9 @@ bool DPAnalysis::ElectronSelection( Handle<reco::GsfElectronCollection> electron
 
 bool DPAnalysis::MuonSelection( Handle<reco::MuonCollection> muons, vector<const reco::Muon*>& selectedMuons ) {
 
-   float midx = 13.0 ;
    int k = 0;
    for(reco::MuonCollection::const_iterator it = muons->begin(); it != muons->end(); it++) {
-       if ( it->pt() < muonCuts[1] || fabs( it->eta() ) > muonCuts[2] ) continue ;
+       if ( it->pt() < muonCuts[0] || fabs( it->eta() ) > muonCuts[1] ) continue ;
        // Isolation for PAT muon
        //double relIso =  ( it->chargedHadronIso()+ it->neutralHadronIso() + it->photonIso () ) / it->pt();
        // Isolation for RECO muon
@@ -477,15 +498,15 @@ bool DPAnalysis::MuonSelection( Handle<reco::MuonCollection> muons, vector<const
        if ( it->isIsolationValid() ) {
 	 relIso = ( it->isolationR05().emEt + it->isolationR05().hadEt + it->isolationR05().sumPt ) / it->pt();
        }
-       if ( relIso > muonCuts[3] ) continue ;
+       if ( relIso > muonCuts[2] ) continue ;
+       /*
        double dR = 999. ;
        for (size_t j=0; j < selectedJets.size(); j++ ) {
            double dR_ =  ROOT::Math::VectorUtil::DeltaR( it->p4(), selectedJets[j]->p4() ) ; 
            if ( dR_ < dR ) dR = dR_ ;
        }
-       if ( dR <= muonCuts[4] ) continue ;
-       midx += 0.1 ;
-       //if ( !it->superCluster().isNull() ) sclist.push_back( make_pair(it->superCluster(), midx ) );
+       if ( dR <= muonCuts[3] ) continue ;
+       */
        if ( k >= MAXMU ) break ;
        selectedMuons.push_back( &(*it) ) ;
        leaves.muPx[k] = it->p4().Px() ;
@@ -521,10 +542,12 @@ bool DPAnalysis::sMinorSelection( vector<const reco::Photon*>& selectedPhotons, 
         //float sMaj =  moments.sMaj  ;
 
         // seed Time 
+        /* 
         pair<DetId, float> maxRH = EcalClusterTools::getMaximum( *SCseed, rechits );
         DetId seedCrystalId = maxRH.first;
         EcalRecHitCollection::const_iterator seedRH = rechits->find(seedCrystalId);
         float seedTime = (float)seedRH->time();
+        */
 
         //if ( sMin < 0.  ) selectedPhotons.erase( selectedPhotons.begin() + i ) ;
         if ( sMin <= photonCuts[3] || sMin >= photonCuts[4] ) selectedPhotons.erase( selectedPhotons.begin() + i ) ;

@@ -53,7 +53,7 @@ void GenStudy::GetGen(const edm::Event& iEvent, Ntuple leaves ) {
 
        if ( it->pdgId() == 1000022 && it->status() == 3 ) {
           leaves.pdgId[i] = it->pdgId() ;
-          leaves.momId[i] = 0 ;
+          leaves.momId[i] = -1 ;
           leaves.genPx[i] = it->p4().Px() ;
           leaves.genPy[i] = it->p4().Py() ;
           leaves.genPz[i] = it->p4().Pz() ;
@@ -133,7 +133,8 @@ bool GenStudy::Propagator( LorentzVector v, double& x, double& y, double& z, dou
        //double trace = sqrt( (r*r) + (z*z ) ) ;
        //alived     = ( trace < (ctaugamma/10.)    ) ? true : false ;
        alived     = ( t < (ctaugamma/300.)     ) ? true : false ;
-       insideEcal = ( r < 129 && fabs(z) < 293.5 ) ? true : false ;
+       //insideEcal = ( r < 129 && fabs(z) < 293.5 ) ? true : false ;
+       insideEcal = ( r < 155 && fabs(z) < 350 ) ? true : false ;
 
     } while ( insideEcal && alived ) ;
  

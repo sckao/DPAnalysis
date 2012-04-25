@@ -131,7 +131,7 @@ class DPAnalysis : public edm::EDAnalyzer {
 
       // ----------member data ---------------------------
       string rootFileName;
-      string triggerName ;
+      string triggerPatent ;
       bool isData ;
 
       edm::InputTag trigSource;
@@ -163,6 +163,8 @@ class DPAnalysis : public edm::EDAnalyzer {
       bool passEvent ;
       int counter[10] ; 
       float sMin_ ;
+
+      string TriggerName ;
 
 };
 

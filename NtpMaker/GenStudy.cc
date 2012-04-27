@@ -42,7 +42,113 @@ GenStudy::~GenStudy() {
 //
 
 // ------------ method called for each event  ------------
-void GenStudy::GetGen(const edm::Event& iEvent, Ntuple leaves ) {
+void GenStudy::PrintGenEvent(const edm::Event& iEvent ) {
+
+   Handle<edm::HepMCProduct> HepMCEvt;
+   iEvent.getByLabel("generator", "", HepMCEvt);
+   const HepMC::GenEvent* MCEvt = HepMCEvt->GetEvent();
+   printf( " ======================================== \n ") ;
+   for ( HepMC::GenEvent::particle_const_iterator it = MCEvt->particles_begin(); it != MCEvt->particles_end(); ++it ) {
+       if ( (*it)->pdg_id() != 1000022 ) continue ;
+       HepMC::FourVector p4 = (*it)->momentum();
+       HepMC::FourVector v1 = (*it)->production_vertex()->position() ;
+       cout<<" PID: "<< (*it)->pdg_id() <<" m:"<< (*it)->generatedMass() <<" E:"<< p4.e()<<" stat:"<<(*it)->status() ;
+       cout<<"   from : "<< v1.z() <<" @T: "<< v1.t() ;
+       if ( (*it)->status() == 3) {
+          HepMC::FourVector v2 = (*it)->end_vertex()->position() ;
+          cout<<"   to "<< v2.z() <<" @T: "<< v2.t() << endl;
+       }
+
+       // trace its parents
+       HepMC::GenVertex* v_in = (*it)->production_vertex() ;
+       for ( HepMC::GenVertex::particles_in_const_iterator i1 = v_in->particles_in_const_begin(); i1 != v_in->particles_in_const_end(); i1++) {
+           cout<<"  <=== pid: "<< (*i1)->pdg_id() <<" E:"<< (*i1)->momentum().e()<<" stat:"<<(*i1)->status() <<endl ;
+       }
+       // trace its children
+       if ( (*it)->status() == 3) {
+          HepMC::GenVertex* v_out = (*it)->end_vertex() ;
+          for ( HepMC::GenVertex::particles_out_const_iterator i1 = v_out->particles_out_const_begin(); i1 != v_out->particles_out_const_end(); i1++) {
+              cout<<"  ===> pid: "<< (*i1)->pdg_id() <<" E:"<< (*i1)->momentum().e()<<" stat:"<<(*i1)->status() <<endl ;
+          }
+       }
+       //cout<<" PID: "<< (*it)->pdg_id() <<" P:"<< p4.pz() <<endl ;
+   }
+    
+}
+
+// time in ns, length in cm
+void GenStudy::GetGenEvent(const edm::Event& iEvent, Ntuple& leaves ) {
+
+   Handle<edm::HepMCProduct> HepMCEvt;
+   iEvent.getByLabel("generator", "", HepMCEvt);
+   const HepMC::GenEvent* MCEvt = HepMCEvt->GetEvent();
+   int i = 0 ;
+   for ( HepMC::GenEvent::particle_const_iterator it = MCEvt->particles_begin(); it != MCEvt->particles_end(); ++it ) {
+       // tag neutrilino(1000022)
+       if ( (*it)->pdg_id() != 1000022 || (*it)->status() != 3 ) continue ;
+       HepMC::FourVector p4 = (*it)->momentum();
+       HepMC::FourVector v1 = (*it)->production_vertex()->position() ;
+
+       leaves.pdgId[i] = (*it)->pdg_id() ;
+       leaves.momId[i] = -1 ;
+       leaves.genPx[i] = p4.px() ;
+       leaves.genPy[i] = p4.py() ;
+       leaves.genPz[i] = p4.pz() ;
+       leaves.genE[i]  = p4.e() ;
+       leaves.genM[i]  = (*it)->generatedMass() ;
+
+       HepMC::FourVector v2 = (*it)->end_vertex()->position() ;
+       leaves.genVx[i] = v2.x() / 10. ;
+       leaves.genVy[i] = v2.y() / 10.;
+       leaves.genVz[i] = v2.z() / 10.;
+       leaves.genT[i]  = (v2.t() - v1.t()) / 300.;
+       
+       int xi = i ;
+       i++ ;
+       //double beta = sqrt( (p4.px()*p4.px()) + (p4.py()*p4.py()) + (p4.pz()*p4.pz()) ) / p4.e() ;
+       //cout<< i <<") PID: "<<(*it)->pdg_id() <<" E:"<<p4.e() <<"  r: "<<v2.rho() <<"  t: "<< v2.t() - v1.t()<<" b: "<< beta <<" z:"<<v2.z() <<endl;
+
+       // trace its children, photon(22) and gravitino(1000039)
+       HepMC::GenVertex* v_out = (*it)->end_vertex() ;
+       for ( HepMC::GenVertex::particles_out_const_iterator i1 = v_out->particles_out_const_begin(); i1 != v_out->particles_out_const_end(); i1++) {
+           /*
+           HepMC::GenVertex* v0_out = (*i1)->production_vertex() ;
+           if ( (*i1)->pdg_id()== 1000022 ) {
+              leaves.genVx[xi] = v0_out->position().x() ;
+	      leaves.genVy[xi] = v0_out->position().y() ;
+	      leaves.genVz[xi] = v0_out->position().z() ;
+	      leaves.genT[xi]  = v0_out->position().t() - v_out->position().t() ;
+              cout<<"  <"<< xi <<">  PID: "<<(*i1)->pdg_id() <<" from "<< xi <<" E:"<< (*i1)->momentum().e() <<"  z: "<< v0_out->position().z() ;
+              cout<<"  t: "<< v0_out->position().t() - v_out->position().t() << endl;
+           }
+           */
+           HepMC::GenVertex* v1_out = (*i1)->end_vertex() ;
+           if ( (*i1)->pdg_id() != 22 &&  (*i1)->pdg_id() != 1000039 ) continue ;
+           for ( HepMC::GenVertex::particles_out_const_iterator i2  = v1_out->particles_out_const_begin(); 
+                                                                i2 != v1_out->particles_out_const_end(); i2++) {
+               if ( (*i2)->status() != 1 ) continue ;
+	       leaves.pdgId[i] = (*i2)->pdg_id() ;
+	       leaves.momId[i] = xi ;
+	       leaves.genPx[i] = (*i2)->momentum().px() ;
+	       leaves.genPy[i] = (*i2)->momentum().py() ;
+	       leaves.genPz[i] = (*i2)->momentum().pz() ;
+	       leaves.genE[i]  = (*i2)->momentum().e() ;
+	       leaves.genM[i]  = (*i2)->generatedMass() ;
+	       leaves.genVx[i] = v1_out->position().x() / 10. ;
+	       leaves.genVy[i] = v1_out->position().y() / 10. ;
+	       leaves.genVz[i] = v1_out->position().z() / 10. ;
+	       leaves.genT[i]  = (v1_out->position().t() - v_out->position().t()) / 300. ;
+               i++ ;
+               //cout<<"  <"<< i <<">  PID: "<<(*i2)->pdg_id() <<" from "<< xi <<" E:"<< (*i2)->momentum().e() <<"  r: "<< v1_out->position().rho() ;
+               //cout<<"  t: "<< v1_out->position().t() - v_out->position().t() <<endl;
+           }
+       }
+   }
+   leaves.nGen = i ;      
+   //cout<<" nGen = "<< leaves.nGen <<endl ;
+}
+
+void GenStudy::GetGen(const edm::Event& iEvent, Ntuple& leaves ) {
 
    Handle< std::vector<reco::GenParticle> > genParticles;
    iEvent.getByLabel( genSrc , genParticles );
@@ -52,6 +158,7 @@ void GenStudy::GetGen(const edm::Event& iEvent, Ntuple leaves ) {
    for (std::vector<reco::GenParticle>::const_iterator it = genParticles->begin(); it != genParticles->end(); it++ ){
 
        if ( it->pdgId() == 1000022 && it->status() == 3 ) {
+          
           leaves.pdgId[i] = it->pdgId() ;
           leaves.momId[i] = -1 ;
           leaves.genPx[i] = it->p4().Px() ;
@@ -91,6 +198,7 @@ void GenStudy::GetGen(const edm::Event& iEvent, Ntuple leaves ) {
               if( abs(dau->pdgId()) != 22 ) continue;
               //printf( "   pID = %d ,  status: %d  E: %.2f \n" , dau->pdgId(),  dau->status(), dau->energy() ) ;
               //printf( "   vtx=( %.2f, %.2f, %.2f ) \n" , dau->vx(),  dau->vy(), dau->vz() ) ;
+              
               leaves.genPx[i] = dau->px() ;
               leaves.genPy[i] = dau->py() ;
               leaves.genPz[i] = dau->pz() ;
@@ -100,6 +208,7 @@ void GenStudy::GetGen(const edm::Event& iEvent, Ntuple leaves ) {
               leaves.genVz[i] = z1 ;
               leaves.momId[i]  = i-1 ;
               leaves.pdgId[i]  = 22 ;
+              
               Propagator( dau->p4(), x1, y1, z1, t1 ) ;
               double t0 = sqrt( (x1*x1) + (y1*y1) + (z1*z1) ) /30. ;
               //printf( "   pos:( %.2f, %.2f, %.2f),  T: %.2f  T0: %.2f \n" , x1, y1, z1, t1, t0 ) ;

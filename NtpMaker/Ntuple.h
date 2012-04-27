@@ -86,6 +86,7 @@ struct Ntuple
   float genPy[MAXGEN] ; 
   float genPz[MAXGEN] ; 
   float genE[MAXGEN] ; 
+  float genM[MAXGEN] ; 
   float genVx[MAXGEN] ; 
   float genVy[MAXGEN] ; 
   float genVz[MAXGEN] ; 

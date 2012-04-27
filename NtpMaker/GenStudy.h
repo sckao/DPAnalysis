@@ -39,6 +39,10 @@
 #include "DataFormats/Candidate/interface/CandidateFwd.h"
 #include "DataFormats/RecoCandidate/interface/RecoCandidate.h"
 
+#include "SimDataFormats/GeneratorProducts/interface/HepMCProduct.h"
+#include "HepMC/GenParticle.h"
+#include "HepMC/SimpleVector.h"
+
 #include <TMath.h>
 #include <Math/VectorUtil.h>
 #include <TRandom.h>
@@ -59,7 +63,9 @@ class GenStudy {
       explicit GenStudy(const edm::ParameterSet& );
       ~GenStudy();
 
-      void GetGen(const edm::Event&, Ntuple leaves );
+      void GetGen(const edm::Event&, Ntuple& leaves );
+      void GetGenEvent(const edm::Event&, Ntuple& leaves );
+      void PrintGenEvent(const edm::Event& ) ;
 
    private:
 
@@ -70,7 +76,6 @@ class GenStudy {
       // ----------member data ---------------------------
       double tau ;
       edm::InputTag genSrc ;
-
 
 };
 

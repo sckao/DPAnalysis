@@ -115,11 +115,18 @@ void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
    counter[0]++ ;  
    bool passTrigger = TriggerSelection( iEvent ) ;
 
-   if ( !isData ) gen->GetGen( iEvent, leaves );
+   if (  passTrigger ) leaves.triggered    = 1 ;
+   if ( !passTrigger ) leaves.triggered    = 0 ;
+
+   if ( !isData ) { 
+      gen->GetGenEvent( iEvent, leaves );
+      //gen->GetGen( iEvent, leaves );
+   }
+   //if ( !isData ) gen->PrintGenEvent( iEvent );
 
    bool pass = EventSelection( iEvent ) ;
-
-   if ( pass && passTrigger ) theTree->Fill();
+   
+   if ( pass ) theTree->Fill();
 }
 
 bool DPAnalysis::EventSelection(const edm::Event& iEvent ) {

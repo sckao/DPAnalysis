@@ -73,6 +73,7 @@ void setBranchAddresses(TTree* chain, Ntuple& treeVars)
   chain -> SetBranchAddress("genPy",        treeVars.genPy       );
   chain -> SetBranchAddress("genPz",        treeVars.genPz       );
   chain -> SetBranchAddress("genE",         treeVars.genE        );
+  chain -> SetBranchAddress("genM",         treeVars.genM        );
   chain -> SetBranchAddress("genVx",        treeVars.genVx       );
   chain -> SetBranchAddress("genVy",        treeVars.genVy       );
   chain -> SetBranchAddress("genVz",        treeVars.genVz       );
@@ -157,6 +158,7 @@ void setBranches(TTree* chain, Ntuple& treeVars)
   chain -> Branch("genPy",        treeVars.genPy,                 "genPy[nGen]/F");
   chain -> Branch("genPz",        treeVars.genPz,                 "genPz[nGen]/F");
   chain -> Branch("genE",         treeVars.genE,                  "genE[nGen]/F");
+  chain -> Branch("genM",         treeVars.genM,                  "genM[nGen]/F");
   chain -> Branch("genVx",        treeVars.genVx,                 "genVx[nGen]/F");
   chain -> Branch("genVy",        treeVars.genVy,                 "genVy[nGen]/F");
   chain -> Branch("genVz",        treeVars.genVz,                 "genVz[nGen]/F");
@@ -244,6 +246,7 @@ void initializeBranches(TTree* chain, Ntuple& treeVars)
       treeVars.genPy[i] = 0 ;
       treeVars.genPz[i] = 0 ;
       treeVars.genE[i] = 0 ;
+      treeVars.genM[i] = 0 ;
       treeVars.genVx[i] = 0 ;
       treeVars.genVy[i] = 0 ;
       treeVars.genVz[i] = 0 ;

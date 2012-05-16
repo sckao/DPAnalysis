@@ -22,6 +22,7 @@
 #include "DPAnalysis.h"
 #include "Ntuple.h"
 
+using namespace cms ;
 using namespace edm ;
 using namespace std ;
 
@@ -68,6 +69,10 @@ DPAnalysis::DPAnalysis(const edm::ParameterSet& iConfig){
    // reset the counter
    for ( int i=0; i< 10 ; i++) counter[i] = 0 ;
 
+   // initialize the time corrector
+   theTimeCorrector_.initEB("EB");
+   theTimeCorrector_.initEE("EElow");
+
 }
 
 
@@ -90,8 +95,20 @@ DPAnalysis::~DPAnalysis()
 //
 
 // ------------ method called for each event  ------------
-void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
-{
+void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup) {
+
+   // get calibration service
+  // IC's
+  iSetup.get<EcalIntercalibConstantsRcd>().get(ical);
+  // ADCtoGeV
+  iSetup.get<EcalADCToGeVConstantRcd>().get(agc);
+  // transp corrections
+  iSetup.get<EcalLaserDbRecord>().get(laser);
+  // Geometry
+  iSetup.get<CaloGeometryRecord> ().get (pGeometry) ;
+  theGeometry = pGeometry.product() ;
+  // event time
+  eventTime = iEvent.time() ;
 
    initializeBranches( theTree, leaves );
 
@@ -326,6 +343,7 @@ bool DPAnalysis::VertexSelection( Handle<reco::VertexCollection> vtx ) {
        if (   v->ndof()   < vtxCuts[1] ) continue ;
        double d0 = sqrt( ( v->x()*v->x() ) + ( v->y()*v->y() ) );
        if ( d0 >= vtxCuts[2] ) continue ;
+       if ( thisVertex >= MAXVTX ) break ;
 
        leaves.vtxNTracks[thisVertex]= v->tracksSize();
        leaves.vtxChi2[thisVertex] =   v->chi2();
@@ -381,6 +399,8 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
        bool ecalIso = ( (ecalSumEt / it->energy()) < photonIso[2] && ecalSumEt < photonIso[1] ) ; 
        bool hcalIso = ( (hcalSumEt / it->energy()) < photonIso[4] && hcalSumEt < photonIso[3] ) ; 
        if ( !trkIso || !ecalIso || !hcalIso ) continue ;
+       double AveXtalTime =  ClusterTime( it->superCluster(), recHitsEB , recHitsEE );
+       //cout<<" seedT : "<< seedTime <<"  xtalT : "<< AveXtalTime <<endl;
 
        leaves.phoPx[k] = it->p4().Px() ;
        leaves.phoPy[k] = it->p4().Py() ;
@@ -393,7 +413,8 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
 
        leaves.sMinPho[k] = sMin ;
        leaves.sMajPho[k] = sMaj ;
-       leaves.phoTime[k] = seedTime ;
+       leaves.seedTime[k] = seedTime ;
+       leaves.aveTime[k]  = AveXtalTime ;
 
        selectedPhotons.push_back( &(*it) ) ;
        k++ ;
@@ -406,6 +427,75 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
 
 }
 
+double DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitCollection> recHitsEB, Handle<EcalRecHitCollection> recHitsEE ) {
+
+  const EcalIntercalibConstantMap& icalMap = ical->getMap();
+  float adcToGeV = float(agc->getEBValue());
+
+  double xtime = 0 ;
+  double xtimeErr = 0 ;
+
+  for ( reco::CaloCluster_iterator  clus = scRef->clustersBegin() ;  clus != scRef->clustersEnd();  ++clus) {
+
+      // GFdoc clusterDetIds holds crystals that participate to this basic cluster 
+      //loop on xtals in cluster
+      std::vector<std::pair<DetId, float> > clusterDetIds = (*clus)->hitsAndFractions() ; //get these from the cluster
+      for (std::vector<std::pair<DetId, float> >::const_iterator detitr = clusterDetIds.begin () ; 
+           detitr != clusterDetIds.end () ; ++detitr) { 
+	      // Here I use the "find" on a recHit collection... I have been warned...   (GFdoc: ??)
+   	      // GFdoc: check if DetId belongs to ECAL; if so, find it among those if this basic cluster
+    	     if ( (detitr -> first).det () != DetId::Ecal)  { 
+   	          cout << " det is " << (detitr -> first).det () << " (and not DetId::Ecal)" << endl ;
+	          continue ;
+	     }
+             bool isEB = ( (detitr -> first).subdetId () == EcalBarrel)  ? true : false ;
+	   
+	     // GFdoc now find it!
+	     EcalRecHitCollection::const_iterator thishit = (isEB) ? recHitsEB->find( (detitr->first) ) : recHitsEE->find( (detitr->first) );
+	     if (thishit == recHitsEB->end () &&  isEB )  continue ;
+	     if (thishit == recHitsEE->end () && !isEB )  continue ;
+
+	     // GFdoc this is one crystal in the basic cluster
+	     EcalRecHit myhit = (*thishit) ;
+	   
+             // SIC Feb 14 2011 -- Add check on RecHit flags (takes care of spike cleaning in 42X)
+             if ( !( myhit.checkFlag(EcalRecHit::kGood) || myhit.checkFlag(EcalRecHit::kOutOfTime) || 
+                    myhit.checkFlag(EcalRecHit::kPoorCalib)  ) )  continue;
+
+             // thisamp is the EB amplitude of the current rechit
+	     double thisamp  = myhit.energy () ;
+	   
+	     EcalIntercalibConstantMap::const_iterator icalit = icalMap.find(detitr->first);
+	     EcalIntercalibConstant icalconst = 1;
+	     if( icalit!=icalMap.end() ) {
+	       icalconst = (*icalit);
+	     } else {
+	       edm::LogError("EcalTimePhyTreeMaker") << "No intercalib const found for xtal " << (detitr->first).rawId();
+   	     }
+	   
+	     // get laser coefficient
+	     float lasercalib = laser->getLaserCorrection( detitr->first, eventTime );
+
+	     // discard rechits with A/sigma < 12
+	     if ( thisamp/(icalconst*lasercalib*adcToGeV) < (1.1*12) ) continue;
+
+	     GlobalPoint pos = theGeometry->getPosition((myhit).detid());
+
+             // time and time correction
+	     double thistime = myhit.time();
+	     thistime += theTimeCorrector_.getCorrection((float) thisamp/(icalconst*lasercalib*adcToGeV), pos.eta()  );
+
+             // get time error 
+             double xtimeErr_ = ( myhit.isTimeErrorValid() ) ?  myhit.timeError() : 999999 ;
+ 
+             xtime     += thistime / pow( xtimeErr_ , 2 ) ;
+             xtimeErr  += 1/ pow( xtimeErr_ , 2 ) ;
+      }
+  }
+  double wAveTime = xtime / xtimeErr ;
+  return wAveTime ;  
+
+}
 
 bool DPAnalysis::JetSelection( Handle<reco::PFJetCollection> jets, vector<const reco::Photon*>& selectedPhotons, 
                                vector<const reco::PFJet*>& selectedJets) {
@@ -535,7 +625,6 @@ bool DPAnalysis::sMinorSelection( vector<const reco::Photon*>& selectedPhotons, 
 
     // sMinor and sMajor are from 
     // CMSSW/JetMETCorrections/GammaJet/src/GammaJetAnalyzer.cc
-    
     vector<float> sMinV ;
  
     size_t sz = selectedPhotons.size() ;

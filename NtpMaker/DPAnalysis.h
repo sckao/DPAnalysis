@@ -29,6 +29,7 @@
 
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/MakerMacros.h"
+#include "FWCore/Framework/interface/ESHandle.h"
 
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 
@@ -70,6 +71,19 @@
 #include "RecoEcal/EgammaCoreTools/interface/EcalClusterTools.h"
 #include <algorithm>
 
+// Calibration services
+#include "Geometry/CaloGeometry/interface/CaloGeometry.h"
+#include "Geometry/Records/interface/CaloGeometryRecord.h"
+
+#include "CondFormats/EcalObjects/interface/EcalIntercalibConstants.h"
+#include "CondFormats/DataRecord/interface/EcalIntercalibConstantsRcd.h"
+#include "CondFormats/EcalObjects/interface/EcalADCToGeVConstant.h"
+#include "CondFormats/DataRecord/interface/EcalADCToGeVConstantRcd.h"
+#include "CalibCalorimetry/EcalLaserCorrection/interface/EcalLaserDbService.h"
+#include "CalibCalorimetry/EcalLaserCorrection/interface/EcalLaserDbRecord.h"
+#include "RecoEcal/EgammaCoreTools/interface/EcalTools.h"
+#include "CalibCalorimetry/EcalTiming/interface/timeVsAmpliCorrector.h"
+
 // PU SummeryInfo
 //#include "SimDataFormats/PileupSummaryInfo/interface/PileupSummaryInfo.h" 
 
@@ -105,6 +119,8 @@ class DPAnalysis : public edm::EDAnalyzer {
       bool VertexSelection( edm::Handle<reco::VertexCollection> vtx ) ;
 
       bool PhotonSelection(  edm::Handle<reco::PhotonCollection> photons, edm::Handle<EcalRecHitCollection> recHitsEB, edm::Handle<EcalRecHitCollection> recHitsEE, vector<const reco::Photon*>& selectedPhotons ) ;
+
+      double ClusterTime( reco::SuperClusterRef scRef, edm::Handle<EcalRecHitCollection> recHitsEB, edm::Handle<EcalRecHitCollection> recHitsEE ) ;
 
       bool JetSelection( edm::Handle<reco::PFJetCollection> jets, vector<const reco::Photon*>& selectedPhotons,
                                                                      vector<const reco::PFJet*>& selectedJets ) ;
@@ -147,6 +163,12 @@ class DPAnalysis : public edm::EDAnalyzer {
       edm::InputTag EERecHitCollection;
       //edm::InputTag pileupSource ;
 
+      edm::ESHandle<EcalIntercalibConstants> ical;
+      edm::ESHandle<EcalADCToGeVConstant> agc;
+      edm::ESHandle<EcalLaserDbService> laser;
+      edm::ESHandle<CaloGeometry> pGeometry ;
+      const CaloGeometry * theGeometry ;
+
       std::vector<double> muonCuts ;
       std::vector<double> electronCuts ;
       std::vector<double> photonCuts ;
@@ -163,6 +185,9 @@ class DPAnalysis : public edm::EDAnalyzer {
       bool passEvent ;
       int counter[10] ; 
       float sMin_ ;
+
+      timeCorrector theTimeCorrector_;
+      edm::Timestamp eventTime ;
 
       string TriggerName ;
 

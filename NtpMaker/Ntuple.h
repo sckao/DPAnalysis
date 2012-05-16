@@ -74,7 +74,8 @@ struct Ntuple
   float phoHcalIso[MAXPHO];
   float phoTrkIso[MAXPHO];
   float phoHoverE[MAXPHO];
-  float phoTime[MAXPHO];
+  float seedTime[MAXPHO];
+  float aveTime[MAXPHO];
   float sMinPho[MAXPHO];
   float sMajPho[MAXPHO];
 

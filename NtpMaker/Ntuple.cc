@@ -65,7 +65,8 @@ void setBranchAddresses(TTree* chain, Ntuple& treeVars)
   chain -> SetBranchAddress("phoHcalIso",   treeVars.phoHcalIso ) ;
   chain -> SetBranchAddress("phoTrkIso",    treeVars.phoTrkIso ) ;
   chain -> SetBranchAddress("phoHoverE",    treeVars.phoHoverE ) ;
-  chain -> SetBranchAddress("phoTime",      treeVars.phoTime ) ;
+  chain -> SetBranchAddress("seedTime",     treeVars.seedTime ) ;
+  chain -> SetBranchAddress("aveTime",      treeVars.aveTime ) ;
   chain -> SetBranchAddress("sMinPho",      treeVars.sMinPho ) ;
   chain -> SetBranchAddress("sMajPho",      treeVars.sMajPho ) ;
 
@@ -138,7 +139,8 @@ void setBranches(TTree* chain, Ntuple& treeVars)
   chain -> Branch("phoHcalIso",   treeVars.phoHcalIso,            "phoHcalIso[nPhotons]/F") ;
   chain -> Branch("phoTrkIso",    treeVars.phoTrkIso,             "phoTrkIso[nPhotons]/F") ;
   chain -> Branch("phoHoverE",    treeVars.phoHoverE,             "phoHoverE[nPhotons]/F") ;
-  chain -> Branch("phoTime",      treeVars.phoTime,               "phoTime[nPhotons]/F") ;
+  chain -> Branch("seedTime",     treeVars.seedTime,              "seedTime[nPhotons]/F") ;
+  chain -> Branch("aveTime",      treeVars.aveTime,               "aveTime[nPhotons]/F") ;
   chain -> Branch("sMinPho",      treeVars.sMinPho,               "sMinPho[nPhotons]/F") ;
   chain -> Branch("sMajPho",      treeVars.sMajPho,               "sMajPho[nPhotons]/F") ;
  
@@ -224,7 +226,8 @@ void initializeBranches(TTree* chain, Ntuple& treeVars)
       treeVars.phoHcalIso[i] = -1 ;
       treeVars.phoTrkIso[i]  = -1 ;
       treeVars.phoHoverE[i]  = -1 ;
-      treeVars.phoTime[i]    = -25 ;
+      treeVars.seedTime[i]   = -25 ;
+      treeVars.aveTime[i]    = -25 ;
       treeVars.sMinPho[i]    = -1 ;
       treeVars.sMajPho[i]    = -1 ;
   }

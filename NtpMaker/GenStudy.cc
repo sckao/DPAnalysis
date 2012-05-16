@@ -76,7 +76,7 @@ void GenStudy::PrintGenEvent(const edm::Event& iEvent ) {
     
 }
 
-// time in ns, length in cm
+// From GenEvent , time in ns, length in cm
 void GenStudy::GetGenEvent(const edm::Event& iEvent, Ntuple& leaves ) {
 
    Handle<edm::HepMCProduct> HepMCEvt;
@@ -101,7 +101,7 @@ void GenStudy::GetGenEvent(const edm::Event& iEvent, Ntuple& leaves ) {
        leaves.genVx[i] = v2.x() / 10. ;
        leaves.genVy[i] = v2.y() / 10.;
        leaves.genVz[i] = v2.z() / 10.;
-       leaves.genT[i]  = (v2.t() - v1.t()) / 300.;
+       leaves.genT[i]  = (v2.t() - v1.t()) / 300.;  // this is tau*gamma*beta
        
        int xi = i ;
        i++ ;
@@ -148,6 +148,7 @@ void GenStudy::GetGenEvent(const edm::Event& iEvent, Ntuple& leaves ) {
    //cout<<" nGen = "<< leaves.nGen <<endl ;
 }
 
+// From GenParticles
 void GenStudy::GetGen(const edm::Event& iEvent, Ntuple& leaves ) {
 
    Handle< std::vector<reco::GenParticle> > genParticles;

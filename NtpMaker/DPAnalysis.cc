@@ -326,6 +326,7 @@ void DPAnalysis::PrintTriggers( const edm::Event& iEvent ) {
        cout<<" name: "<< tName <<"  idx:"<< trgIndex <<"  accept:"<< trgResult <<endl;
        if ( strncmp( tName.c_str(), triggerPatent.c_str(), triggerPatent.size() ) ==0 ) {
           TriggerName = tName ;
+          cout<<" Trigger Found : "<< tName <<" accepted ? "<< triggers->accept(i) <<endl;
        }
        //string triggered = triggers->accept(i) ? "Yes" : "No" ;
        //cout<<" path("<<i<<") accepted ? "<< triggered ;

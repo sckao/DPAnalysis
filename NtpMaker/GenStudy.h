@@ -64,7 +64,7 @@ class GenStudy {
       ~GenStudy();
 
       void GetGen(const edm::Event&, Ntuple& leaves );
-      void GetGenEvent(const edm::Event&, Ntuple& leaves );
+      void GetGenEvent(const edm::Event&, Ntuple& leaves, bool debug = false );
       void PrintGenEvent(const edm::Event& ) ;
 
    private:

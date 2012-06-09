@@ -77,7 +77,7 @@ void GenStudy::PrintGenEvent(const edm::Event& iEvent ) {
 }
 
 // From GenEvent , time in ns, length in cm
-void GenStudy::GetGenEvent(const edm::Event& iEvent, Ntuple& leaves ) {
+void GenStudy::GetGenEvent(const edm::Event& iEvent, Ntuple& leaves, bool debug ) {
 
    Handle<edm::HepMCProduct> HepMCEvt;
    iEvent.getByLabel("generator", "", HepMCEvt);
@@ -87,7 +87,7 @@ void GenStudy::GetGenEvent(const edm::Event& iEvent, Ntuple& leaves ) {
        // tag neutrilino(1000022)
        if ( (*it)->pdg_id() != 1000022 || (*it)->status() != 3 ) continue ;
        HepMC::FourVector p4 = (*it)->momentum();
-       HepMC::FourVector v1 = (*it)->production_vertex()->position() ;
+       //HepMC::FourVector v1 = (*it)->production_vertex()->position() ;
 
        leaves.pdgId[i] = (*it)->pdg_id() ;
        leaves.momId[i] = -1 ;
@@ -101,13 +101,12 @@ void GenStudy::GetGenEvent(const edm::Event& iEvent, Ntuple& leaves ) {
        leaves.genVx[i] = v2.x() / 10. ;
        leaves.genVy[i] = v2.y() / 10.;
        leaves.genVz[i] = v2.z() / 10.;
-       leaves.genT[i]  = (v2.t() - v1.t()) / 300.;  // this is tau*gamma*beta
-       
+       //leaves.genT[i]  = ( v2.t() - v1.t() ) / 300. ; still zero ... useless
+       if ( debug ) cout<<" ------------------------ "<<endl ;
        int xi = i ;
        i++ ;
-       //double beta = sqrt( (p4.px()*p4.px()) + (p4.py()*p4.py()) + (p4.pz()*p4.pz()) ) / p4.e() ;
-       //cout<< i <<") PID: "<<(*it)->pdg_id() <<" E:"<<p4.e() <<"  r: "<<v2.rho() <<"  t: "<< v2.t() - v1.t()<<" b: "<< beta <<" z:"<<v2.z() <<endl;
 
+       double beta  = sqrt( (p4.px()*p4.px()) + (p4.py()*p4.py()) + (p4.pz()*p4.pz()) ) / p4.e() ;
        // trace its children, photon(22) and gravitino(1000039)
        HepMC::GenVertex* v_out = (*it)->end_vertex() ;
        for ( HepMC::GenVertex::particles_out_const_iterator i1 = v_out->particles_out_const_begin(); i1 != v_out->particles_out_const_end(); i1++) {
@@ -137,10 +136,17 @@ void GenStudy::GetGenEvent(const edm::Event& iEvent, Ntuple& leaves ) {
 	       leaves.genVx[i] = v1_out->position().x() / 10. ;
 	       leaves.genVy[i] = v1_out->position().y() / 10. ;
 	       leaves.genVz[i] = v1_out->position().z() / 10. ;
-	       leaves.genT[i]  = (v1_out->position().t() - v_out->position().t()) / 300. ;
-               i++ ;
-               //cout<<"  <"<< i <<">  PID: "<<(*i2)->pdg_id() <<" from "<< xi <<" E:"<< (*i2)->momentum().e() <<"  r: "<< v1_out->position().rho() ;
-               //cout<<"  t: "<< v1_out->position().t() - v_out->position().t() <<endl;
+	       leaves.genT[xi]  = (v1_out->position().t() - v_out->position().t()) / 300. ; // this is tau*gamma for neutralino
+	       leaves.genT[i]  = -1 ;  // this is lifetime(tau*gamma) for photon and gravitino
+               if ( debug ) {
+                  double dx = v1_out->position().x() - v_out->position().x() ;
+		  double dy = v1_out->position().y() - v_out->position().y() ;
+		  double dz = v1_out->position().z() - v_out->position().z() ;
+		  double dr = sqrt( (dx*dx) +  (dy*dy) + (dz*dz) ) ;
+		  cout<<"  <"<< i <<">  PID: "<<(*i2)->pdg_id() <<" from "<< xi <<" beta:"<< beta ;
+		  cout<<"  t: "<< v1_out->position().t() - v_out->position().t() <<" ctg: "<< dr/beta <<" ctbg: "<< dr  <<endl;
+               }
+	       i++ ;
            }
        }
    }

@@ -10,9 +10,11 @@ process.source = cms.Source("PoolSource",
     # replace 'myfile.root' with the source file you want to use
     fileNames = cms.untracked.vstring(
         #'dcache:/pnfs/cms/WAX/11/store/data/Run2012A/Photon/AOD/PromptReco-v1/000/191/247/002CDB97-4588-E111-8BF4-003048D37694.root',
+       'dcache:/pnfs/cms/WAX/11/store/data/Run2012B/SinglePhoton/RECO/PromptReco-v1/000/193/998/10950429-439D-E111-B454-BCAEC5329705.root'
+
         #'dcache:/pnfs/cms/WAX/11/store/data/Run2012A/Photon/AOD/PromptReco-v1/000/191/247/069259D0-2C88-E111-9729-5404A63886C3.root'
-        'dcache:/pnfs/cms/WAX/11/store/data/Run2011B/Photon/AOD/PromptReco-v1/000/179/558/5886DB5E-A5FF-E011-92AE-BCAEC5364CFB.root'
-        #'dcache:/pnfs/cms/WAX/resilient/sckao/GMSB_FastSim/GMSB_L100_CTau1000_1.root'
+        #'dcache:/pnfs/cms/WAX/11/store/data/Run2011B/Photon/AOD/PromptReco-v1/000/179/558/5886DB5E-A5FF-E011-92AE-BCAEC5364CFB.root'
+        #'dcache:/pnfs/cms/WAX/resilient/sckao/MC2012/GMSB_L100_CTau1000_8TeV_RECO_10_1_qX9.root'
         #'dcache:/pnfs/cms/WAX/11/store/data/Run2011A/Photon/AOD/PromptReco-v6/000/173/389/B8BBAB75-A4CA-E011-84BA-BCAEC53296F8.root'
  
     ),
@@ -32,7 +34,8 @@ process.options   = cms.untracked.PSet(
 
 process.ana = cms.EDAnalyzer('DPAnalysis',
     rootFileName     = cms.untracked.string('Photon_2011B_test.root'),
-    triggerName      = cms.untracked.string('HLT_Photon75_CaloIdVL_IsoL'),
+    #triggerName      = cms.untracked.string('HLT_Photon50_CaloIdVL_IsoL'),
+    triggerName      = cms.vstring('HLT_Photon50_CaloIdVL_IsoL','HLT_DisplacedPhoton65_CaloIdVL_IsoL_PFMET25'),
     isData           = cms.untracked.bool(True),
     trigSource = cms.InputTag("TriggerResults","","HLT"),
     jetSource   = cms.InputTag("ak5PFJets"),
@@ -51,7 +54,7 @@ process.ana = cms.EDAnalyzer('DPAnalysis',
     # vertex cuts                z   ndof   d0 
     vtxCuts       = cms.vdouble( 99,    0,  99 ),
     # photon cuts                pt   eta  sMajMax,  sMinMin, sMinMax,  Num  
-    photonCuts    = cms.vdouble( 50,  2.4,    999.,      0.0,     99.,    1  ),
+    photonCuts    = cms.vdouble( 45,  2.4,    999.,      0.0,     99.,    1  ),
     # photon isolation           trk,  ecalSumEt, ecalR, hcalSumEt, hcalR 
     photonIso     = cms.vdouble(  0.2,       4.5,   0.1,       4.0,   0.1 ),
     # jet cuts                   pt    eta    dR,  nJets
@@ -68,7 +71,8 @@ process.ana = cms.EDAnalyzer('DPAnalysis',
 # Global Tag
 process.load("Configuration.StandardSequences.FrontierConditions_GlobalTag_cff")
 #process.load("Configuration.StandardSequences.FrontierConditions_GlobalTag_noesprefer_cff")
-process.GlobalTag.globaltag = 'GR_P_V22::All'
+process.GlobalTag.globaltag = 'GR_P_V35::All'
+#process.GlobalTag.globaltag = 'START52_V9::All'
 
 # to get clustering 
 process.load('Configuration/StandardSequences/GeometryExtended_cff')
@@ -81,6 +85,8 @@ process.load("Geometry.EcalMapping.EcalMapping_cfi")
 process.load("Geometry.EcalMapping.EcalMappingRecord_cfi")
 process.load("Geometry.MuonNumbering.muonNumberingInitialization_cfi") # gfwork: need this?
 
+
+process.CaloTowerConstituentsMapBuilder = cms.ESProducer("CaloTowerConstituentsMapBuilder")
 
 process.load("RecoEcal.EgammaClusterProducers.uncleanSCRecovery_cfi")
 process.uncleanSCRecovered.cleanScCollection=cms.InputTag ("correctedHybridSuperClusters")

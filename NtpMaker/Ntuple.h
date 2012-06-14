@@ -74,10 +74,14 @@ struct Ntuple
   float phoHcalIso[MAXPHO];
   float phoTrkIso[MAXPHO];
   float phoHoverE[MAXPHO];
-  float seedTime[MAXPHO];
-  float aveTime[MAXPHO];
   float sMinPho[MAXPHO];
   float sMajPho[MAXPHO];
+  float seedTime[MAXPHO];
+  float seedTimeErr[MAXPHO];
+  float aveTime[MAXPHO];
+  float aveTime1[MAXPHO];
+  float aveTimeErr[MAXPHO];
+  float aveTimeErr1[MAXPHO];
 
   // Gen Particle information
   int nGen ; 

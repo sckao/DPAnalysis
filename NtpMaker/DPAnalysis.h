@@ -120,7 +120,8 @@ class DPAnalysis : public edm::EDAnalyzer {
 
       bool PhotonSelection(  edm::Handle<reco::PhotonCollection> photons, edm::Handle<EcalRecHitCollection> recHitsEB, edm::Handle<EcalRecHitCollection> recHitsEE, vector<const reco::Photon*>& selectedPhotons ) ;
 
-      double ClusterTime( reco::SuperClusterRef scRef, edm::Handle<EcalRecHitCollection> recHitsEB, edm::Handle<EcalRecHitCollection> recHitsEE ) ;
+      pair<double,double> ClusterTime( reco::SuperClusterRef scRef, edm::Handle<EcalRecHitCollection> recHitsEB, edm::Handle<EcalRecHitCollection> recHitsEE ) ;
+      void ClusterTime( reco::SuperClusterRef scRef, edm::Handle<EcalRecHitCollection> recHitsEB, edm::Handle<EcalRecHitCollection> recHitsEE, double& aveTime, double& aveTimeErr ) ;
 
       bool JetSelection( edm::Handle<reco::PFJetCollection> jets, vector<const reco::Photon*>& selectedPhotons,
                                                                      vector<const reco::PFJet*>& selectedJets ) ;
@@ -147,7 +148,7 @@ class DPAnalysis : public edm::EDAnalyzer {
 
       // ----------member data ---------------------------
       string rootFileName;
-      string triggerPatent ;
+      std::vector<string> triggerPatent ;
       bool isData ;
 
       edm::InputTag trigSource;
@@ -189,7 +190,8 @@ class DPAnalysis : public edm::EDAnalyzer {
       timeCorrector theTimeCorrector_;
       edm::Timestamp eventTime ;
 
-      string TriggerName ;
+      std::vector<int> firedTrig ;
+      ///string TriggerName ;
 
 };
 

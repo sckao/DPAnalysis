@@ -55,7 +55,8 @@ DPAnalysis::DPAnalysis(const edm::ParameterSet& iConfig){
    photonIso            = iConfig.getParameter<std::vector<double> >("photonIso");
    electronCuts         = iConfig.getParameter<std::vector<double> >("electronCuts");
    muonCuts             = iConfig.getParameter<std::vector<double> >("muonCuts");  
-   triggerPatent        = iConfig.getUntrackedParameter<string> ("triggerName");
+   //triggerPatent        = iConfig.getUntrackedParameter<string> ("triggerName");
+   triggerPatent        = iConfig.getParameter< std::vector<string> >("triggerName");
    isData               = iConfig.getUntrackedParameter<bool> ("isData");
 
    gen = new GenStudy( iConfig );
@@ -65,7 +66,7 @@ DPAnalysis::DPAnalysis(const edm::ParameterSet& iConfig){
    theTree  = new TTree ( "DPAnalysis","DPAnalysis" ) ;
    setBranches( theTree, leaves ) ;
 
-   TriggerName = "" ;
+   firedTrig.clear() ;
    // reset the counter
    for ( int i=0; i< 10 ; i++) counter[i] = 0 ;
 
@@ -81,7 +82,7 @@ DPAnalysis::~DPAnalysis()
    // do anything here that needs to be done at desctruction time
 
    delete gen ;
-   cout<<"All:"<< counter[0]<<" dumper:"<<counter[1]<<" Vertex:"<< counter[2] <<" photon:"<<counter[3] ;
+   cout<<"All:"<< counter[0]<<" Trigger:"<<counter[1]<<" Vertex:"<< counter[2] <<" photon:"<<counter[3] ;
    cout<<" sMinor:"<< counter[4] <<" BeamHalo:"<< counter[5] <<" Iso:"<<counter[6] <<" GJet:"<<counter[7] ;
    cout<<" Jets:"<< counter[8] << " G100:"<< counter[9] <<endl;
    theFile->cd () ;
@@ -132,8 +133,7 @@ void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
    counter[0]++ ;  
    bool passTrigger = TriggerSelection( iEvent ) ;
 
-   if (  passTrigger ) leaves.triggered    = 1 ;
-   if ( !passTrigger ) leaves.triggered    = 0 ;
+   if ( passTrigger ) counter[1]++ ;  
 
    if ( !isData ) { 
       gen->GetGenEvent( iEvent, leaves );
@@ -143,7 +143,8 @@ void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
 
    bool pass = EventSelection( iEvent ) ;
    
-   if ( pass ) theTree->Fill();
+   if ( pass && !isData ) theTree->Fill();
+   if ( pass && isData && passTrigger ) theTree->Fill();
 }
 
 bool DPAnalysis::EventSelection(const edm::Event& iEvent ) {
@@ -172,15 +173,15 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent ) {
 
    bool passEvent = true ;
 
-   if ( passEvent )   counter[1]++ ;  
+   if ( passEvent )   counter[2]++ ;  
    bool hasGoodVtx = VertexSelection( recVtxs );
    if ( !hasGoodVtx ) passEvent = false ;
-   if ( passEvent )   counter[2]++ ;  
+   if ( passEvent )   counter[3]++ ;  
 
    selectedPhotons.clear() ;
    PhotonSelection( photons, recHitsEB, recHitsEE, selectedPhotons ) ;
    if ( selectedPhotons.size() < (size_t)photonCuts[5] )  passEvent = false ;
-   if ( passEvent )   counter[3]++ ;  
+   if ( passEvent )   counter[4]++ ;  
 
    //sMinorSelection( selectedPhotons, recHitsEB, recHitsEE ) ;
    //if ( selectedPhotons.size() < (size_t)photonCuts[5] )  passEvent = false ;
@@ -229,6 +230,7 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent ) {
    return passEvent ;
 }
 
+// current used method 
 bool DPAnalysis::TriggerSelection( const edm::Event& iEvent ) {
 
    bool pass =false ;
@@ -236,47 +238,34 @@ bool DPAnalysis::TriggerSelection( const edm::Event& iEvent ) {
    iEvent.getByLabel( trigSource, triggers );
    const edm::TriggerNames& trgNameList = iEvent.triggerNames( *triggers );
 
-   if ( TriggerName.size() == 0 ) { 
+   uint32_t trgbits = 0 ;
+   if ( firedTrig.size() == 0 ) { 
       for ( size_t i =0 ; i < trgNameList.size(); i++ ) {
           string tName  = trgNameList.triggerName( i );
-          if ( strncmp( tName.c_str(), triggerPatent.c_str(), triggerPatent.size() ) ==0 ) {
-             TriggerName = tName ; 
-             cout<<" Trigger Found : "<< tName <<" accepted ? "<< triggers->accept(i) <<endl;
-             pass = ( triggers->accept(i) == 1 ) ? true : false ;
+          // loop through desired triggers
+          for ( size_t j=0; j< triggerPatent.size(); j++ )  {
+              if ( strncmp( tName.c_str(), triggerPatent[j].c_str(), triggerPatent[j].size() ) ==0 ) {
+		 cout<<" Trigger Found : "<< tName <<" accepted ? "<< triggers->accept(i) <<endl;
+                 firedTrig.push_back(i);
+		 pass = ( triggers->accept(i) == 1 ) ? true : false ;
+                 if ( pass) trgbits |= ( 1 << j) ;
+              }
           }
       }
    } else {
 
-          int trgIndex  = trgNameList.triggerIndex( TriggerName );
-          pass = ( triggers->accept(trgIndex) == 1 ) ? true : false ;
-          //if ( pass ) cout<<" Trigger Found : "<< TriggerName  << endl; 
+          for ( size_t i=0; i< firedTrig.size(); i++ ) {
+              pass = ( triggers->accept( firedTrig[i] ) == 1 ) ? true : false ;
+              if ( pass) trgbits |= ( 1 << i) ;
+              //if ( pass ) cout<<" Trigger Found : "<< firedTrig[i] <<" trigbit = "<< trgbits << endl; 
+          }
    } 
 
+   if (  pass ) leaves.triggered    =  (int)(trgbits) ;
+   if ( !pass ) leaves.triggered    =  0 ;
    return pass ;
 }
-/*
-bool DPAnalysis::TriggerSelection( const edm::Event& iEvent ) {
 
-   Handle<edm::TriggerResults> triggers;
-   iEvent.getByLabel( trigSource, triggers );
-
-   const edm::TriggerNames& trgNames = iEvent.triggerNames( *triggers );
-
-   int trgIndex  = trgNames.triggerIndex(triggerPatent);
-   int trgResult = 0;
-   if ( trgIndex == (int)(trgNames.size()) ) {
-          cout<<" NO Matched Trigger -- Turn TriggerSelection Off "<<endl;
-          cout<<"" <<endl;
-          trgResult = 1 ;
-   } else {
-          trgResult = triggers->accept(trgIndex);
-          leaves.triggered = trgResult ;
-   }
-
-   bool pass =  ( trgResult == 1 ) ? true : false ;
-   return pass ;
-}
-*/
 int DPAnalysis::TriggerSelection( const edm::Event& iEvent, int cutVal, string str_head, string str_body ) {
 
    Handle<edm::TriggerResults> triggers;
@@ -324,9 +313,11 @@ void DPAnalysis::PrintTriggers( const edm::Event& iEvent ) {
        int trgIndex  = trgNames.triggerIndex(tName);
        int trgResult = triggers->accept(trgIndex);
        cout<<" name: "<< tName <<"  idx:"<< trgIndex <<"  accept:"<< trgResult <<endl;
-       if ( strncmp( tName.c_str(), triggerPatent.c_str(), triggerPatent.size() ) ==0 ) {
-          TriggerName = tName ;
-          cout<<" Trigger Found : "<< tName <<" accepted ? "<< triggers->accept(i) <<endl;
+       for ( size_t j=0; j< triggerPatent.size(); j++) {
+           if ( strncmp( tName.c_str(), triggerPatent[j].c_str(), triggerPatent[j].size() ) ==0 ) {
+              //TriggerName = tName ;
+              cout<<" Trigger Found : "<< tName <<" accepted ? "<< triggers->accept(i) <<endl;
+           }
        }
        //string triggered = triggers->accept(i) ? "Yes" : "No" ;
        //cout<<" path("<<i<<") accepted ? "<< triggered ;
@@ -386,7 +377,8 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
        pair<DetId, float> maxRH = EcalClusterTools::getMaximum( *SCseed, rechits );
        DetId seedCrystalId = maxRH.first;
        EcalRecHitCollection::const_iterator seedRH = rechits->find(seedCrystalId);
-       float seedTime = (float)seedRH->time();
+       float seedTime    = (float)seedRH->time();
+       float seedTimeErr = (float)seedRH->timeError();
       
        if ( sMaj > photonCuts[2] ) continue ;
        if ( sMin <= photonCuts[3] || sMin >= photonCuts[4] ) continue ;
@@ -400,8 +392,14 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
        bool ecalIso = ( (ecalSumEt / it->energy()) < photonIso[2] && ecalSumEt < photonIso[1] ) ; 
        bool hcalIso = ( (hcalSumEt / it->energy()) < photonIso[4] && hcalSumEt < photonIso[3] ) ; 
        if ( !trkIso || !ecalIso || !hcalIso ) continue ;
-       double AveXtalTime =  ClusterTime( it->superCluster(), recHitsEB , recHitsEE );
-       //cout<<" seedT : "<< seedTime <<"  xtalT : "<< AveXtalTime <<endl;
+       pair<double,double> AveXtalTE =  ClusterTime( it->superCluster(), recHitsEB , recHitsEE );
+       double aveXtalTime    = AveXtalTE.first ;
+       double aveXtalTimeErr = AveXtalTE.second ;
+       //cout<<" 1st xT : "<< aveXtalTime <<"  xTE : "<< aveXtalTimeErr << endl;
+       ClusterTime( it->superCluster(), recHitsEB , recHitsEE, aveXtalTime, aveXtalTimeErr );
+       //cout<<" 2nd xT : "<< aveXtalTime <<"  xTE : "<< aveXtalTimeErr << endl;
+       ClusterTime( it->superCluster(), recHitsEB , recHitsEE, aveXtalTime, aveXtalTimeErr );
+       //cout<<" 3rd xT : "<< aveXtalTime <<"  xTE : "<< aveXtalTimeErr << endl;
 
        leaves.phoPx[k] = it->p4().Px() ;
        leaves.phoPy[k] = it->p4().Py() ;
@@ -415,7 +413,11 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
        leaves.sMinPho[k] = sMin ;
        leaves.sMajPho[k] = sMaj ;
        leaves.seedTime[k] = seedTime ;
-       leaves.aveTime[k]  = AveXtalTime ;
+       leaves.seedTimeErr[k] = seedTimeErr ;
+       leaves.aveTime[k]  = aveXtalTime ;
+       leaves.aveTimeErr[k]   = aveXtalTimeErr ;
+       leaves.aveTime1[k]     =  AveXtalTE.first ;
+       leaves.aveTimeErr1[k]  =  AveXtalTE.second ;
 
        selectedPhotons.push_back( &(*it) ) ;
        k++ ;
@@ -428,7 +430,81 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
 
 }
 
-double DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitCollection> recHitsEB, Handle<EcalRecHitCollection> recHitsEE ) {
+pair<double,double> DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitCollection> recHitsEB, Handle<EcalRecHitCollection> recHitsEE ) {
+
+  const EcalIntercalibConstantMap& icalMap = ical->getMap();
+  float adcToGeV = float(agc->getEBValue());
+
+  double xtime = 0 ;
+  double xtimeErr = 0 ;
+
+  // 1. loop all the basic clusters 
+  for ( reco::CaloCluster_iterator  clus = scRef->clustersBegin() ;  clus != scRef->clustersEnd();  ++clus) {
+
+      // GFdoc clusterDetIds holds crystals that participate to this basic cluster 
+      // 2. loop on xtals in cluster
+      std::vector<std::pair<DetId, float> > clusterDetIds = (*clus)->hitsAndFractions() ; //get these from the cluster
+      for (std::vector<std::pair<DetId, float> >::const_iterator detitr = clusterDetIds.begin () ; 
+           detitr != clusterDetIds.end () ; ++detitr) { 
+
+             // Here I use the "find" on a recHit collection... I have been warned...   (GFdoc: ??)
+   	     // GFdoc: check if DetId belongs to ECAL; if so, find it among those if this basic cluster
+    	     if ( (detitr -> first).det () != DetId::Ecal)  { 
+   	          cout << " det is " << (detitr -> first).det () << " (and not DetId::Ecal)" << endl ;
+	          continue ;
+	     }
+             bool isEB = ( (detitr -> first).subdetId () == EcalBarrel)  ? true : false ;
+	   
+	     // GFdoc now find it!
+	     EcalRecHitCollection::const_iterator thishit = (isEB) ? recHitsEB->find( (detitr->first) ) : recHitsEE->find( (detitr->first) );
+	     if (thishit == recHitsEB->end () &&  isEB )  continue ;
+	     if (thishit == recHitsEE->end () && !isEB )  continue ;
+
+	     // GFdoc this is one crystal in the basic cluster
+	     EcalRecHit myhit = (*thishit) ;
+	   
+             // SIC Feb 14 2011 -- Add check on RecHit flags (takes care of spike cleaning in 42X)
+             if ( !( myhit.checkFlag(EcalRecHit::kGood) || myhit.checkFlag(EcalRecHit::kOutOfTime) || 
+                    myhit.checkFlag(EcalRecHit::kPoorCalib)  ) )  continue;
+
+             // thisamp is the EB amplitude of the current rechit
+	     double thisamp  = myhit.energy () ;
+	   
+	     EcalIntercalibConstantMap::const_iterator icalit = icalMap.find(detitr->first);
+	     EcalIntercalibConstant icalconst = 1;
+	     if( icalit!=icalMap.end() ) {
+	       icalconst = (*icalit);
+	     } else {
+	       edm::LogError("EcalTimePhyTreeMaker") << "No intercalib const found for xtal " << (detitr->first).rawId();
+   	     }
+	   
+	     // get laser coefficient
+	     float lasercalib = laser->getLaserCorrection( detitr->first, eventTime );
+
+	     // discard rechits with A/sigma < 12
+	     if ( thisamp/(icalconst*lasercalib*adcToGeV) < (1.1*12) ) continue;
+
+	     GlobalPoint pos = theGeometry->getPosition((myhit).detid());
+
+             // time and time correction
+	     double thistime = myhit.time();
+	     thistime += theTimeCorrector_.getCorrection((float) thisamp/(icalconst*lasercalib*adcToGeV), pos.eta()  );
+
+             // get time error 
+             double xtimeErr_ = ( myhit.isTimeErrorValid() ) ?  myhit.timeError() : 999999 ;
+ 
+             xtime     += thistime / pow( xtimeErr_ , 2 ) ;
+             xtimeErr  += 1/ pow( xtimeErr_ , 2 ) ;
+      }
+  }
+  double wAveTime = xtime / xtimeErr ;
+  double wAveTimeErr = 1. / sqrt( xtimeErr) ;
+  pair<double, double> wAveTE( wAveTime, wAveTimeErr ) ;
+  return wAveTE ;  
+
+}
+
+void DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitCollection> recHitsEB, Handle<EcalRecHitCollection> recHitsEE, double& aveTime, double& aveTimeErr ) {
 
   const EcalIntercalibConstantMap& icalMap = ical->getMap();
   float adcToGeV = float(agc->getEBValue());
@@ -488,13 +564,17 @@ double DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitCo
 
              // get time error 
              double xtimeErr_ = ( myhit.isTimeErrorValid() ) ?  myhit.timeError() : 999999 ;
+
+             // removed un-qualified hits 
+             if ( fabs ( thistime - aveTime) > 3.*aveTimeErr  ) continue ;
  
              xtime     += thistime / pow( xtimeErr_ , 2 ) ;
              xtimeErr  += 1/ pow( xtimeErr_ , 2 ) ;
       }
   }
-  double wAveTime = xtime / xtimeErr ;
-  return wAveTime ;  
+   // update ave. time and error
+  aveTime    = xtime / xtimeErr ;
+  aveTimeErr = 1. / sqrt( xtimeErr) ;
 
 }
 
@@ -548,7 +628,6 @@ bool DPAnalysis::ElectronSelection( Handle<reco::GsfElectronCollection> electron
 
    // Electron Identification Based on Simple Cuts
    // https://twiki.cern.ch/twiki/bin/view/CMS/SimpleCutBasedEleID#Selections_and_How_to_use_them
-   float eidx = 11. ;
    int k = 0 ;
    for(reco::GsfElectronCollection::const_iterator it = electrons->begin(); it != electrons->end(); it++) {
        if ( it->pt() < electronCuts[0] || fabs( it->eta() ) > electronCuts[1] ) continue ;
@@ -563,8 +642,6 @@ bool DPAnalysis::ElectronSelection( Handle<reco::GsfElectronCollection> electron
 
        double nLost = it->gsfTrack()->trackerExpectedHitsInner().numberOfLostHits() ;
        if ( nLost >= electronCuts[4]  ) continue ;
-       eidx += 0.1 ;
-       //if ( !it->superCluster().isNull() ) sclist.push_back( make_pair(it->superCluster(), eidx ) );
        if ( k >= MAXELE ) break ;
        selectedElectrons.push_back( &(*it) ) ;
        leaves.elePx[k] = it->p4().Px() ;

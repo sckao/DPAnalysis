@@ -110,17 +110,6 @@ void GenStudy::GetGenEvent(const edm::Event& iEvent, Ntuple& leaves, bool debug 
        // trace its children, photon(22) and gravitino(1000039)
        HepMC::GenVertex* v_out = (*it)->end_vertex() ;
        for ( HepMC::GenVertex::particles_out_const_iterator i1 = v_out->particles_out_const_begin(); i1 != v_out->particles_out_const_end(); i1++) {
-           /*
-           HepMC::GenVertex* v0_out = (*i1)->production_vertex() ;
-           if ( (*i1)->pdg_id()== 1000022 ) {
-              leaves.genVx[xi] = v0_out->position().x() ;
-	      leaves.genVy[xi] = v0_out->position().y() ;
-	      leaves.genVz[xi] = v0_out->position().z() ;
-	      leaves.genT[xi]  = v0_out->position().t() - v_out->position().t() ;
-              cout<<"  <"<< xi <<">  PID: "<<(*i1)->pdg_id() <<" from "<< xi <<" E:"<< (*i1)->momentum().e() <<"  z: "<< v0_out->position().z() ;
-              cout<<"  t: "<< v0_out->position().t() - v_out->position().t() << endl;
-           }
-           */
            HepMC::GenVertex* v1_out = (*i1)->end_vertex() ;
            if ( (*i1)->pdg_id() != 22 &&  (*i1)->pdg_id() != 1000039 ) continue ;
            for ( HepMC::GenVertex::particles_out_const_iterator i2  = v1_out->particles_out_const_begin(); 

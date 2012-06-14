@@ -65,10 +65,14 @@ void setBranchAddresses(TTree* chain, Ntuple& treeVars)
   chain -> SetBranchAddress("phoHcalIso",   treeVars.phoHcalIso ) ;
   chain -> SetBranchAddress("phoTrkIso",    treeVars.phoTrkIso ) ;
   chain -> SetBranchAddress("phoHoverE",    treeVars.phoHoverE ) ;
-  chain -> SetBranchAddress("seedTime",     treeVars.seedTime ) ;
-  chain -> SetBranchAddress("aveTime",      treeVars.aveTime ) ;
   chain -> SetBranchAddress("sMinPho",      treeVars.sMinPho ) ;
   chain -> SetBranchAddress("sMajPho",      treeVars.sMajPho ) ;
+  chain -> SetBranchAddress("seedTime",     treeVars.seedTime ) ;
+  chain -> SetBranchAddress("seedTimeErr",  treeVars.seedTimeErr ) ;
+  chain -> SetBranchAddress("aveTime",      treeVars.aveTime ) ;
+  chain -> SetBranchAddress("aveTimeErr",   treeVars.aveTimeErr ) ;
+  chain -> SetBranchAddress("aveTime1",     treeVars.aveTime1 ) ;
+  chain -> SetBranchAddress("aveTimeErr1",  treeVars.aveTimeErr1 ) ;
 
   chain -> SetBranchAddress("genPx",        treeVars.genPx       );
   chain -> SetBranchAddress("genPy",        treeVars.genPy       );
@@ -139,10 +143,14 @@ void setBranches(TTree* chain, Ntuple& treeVars)
   chain -> Branch("phoHcalIso",   treeVars.phoHcalIso,            "phoHcalIso[nPhotons]/F") ;
   chain -> Branch("phoTrkIso",    treeVars.phoTrkIso,             "phoTrkIso[nPhotons]/F") ;
   chain -> Branch("phoHoverE",    treeVars.phoHoverE,             "phoHoverE[nPhotons]/F") ;
-  chain -> Branch("seedTime",     treeVars.seedTime,              "seedTime[nPhotons]/F") ;
-  chain -> Branch("aveTime",      treeVars.aveTime,               "aveTime[nPhotons]/F") ;
   chain -> Branch("sMinPho",      treeVars.sMinPho,               "sMinPho[nPhotons]/F") ;
   chain -> Branch("sMajPho",      treeVars.sMajPho,               "sMajPho[nPhotons]/F") ;
+  chain -> Branch("seedTime",     treeVars.seedTime,              "seedTime[nPhotons]/F") ;
+  chain -> Branch("seedTimeErr",  treeVars.seedTimeErr,           "seedTimeErr[nPhotons]/F") ;
+  chain -> Branch("aveTime",      treeVars.aveTime,               "aveTime[nPhotons]/F") ;
+  chain -> Branch("aveTimeErr",   treeVars.aveTimeErr,            "aveTimeErr[nPhotons]/F") ;
+  chain -> Branch("aveTime1",     treeVars.aveTime1,              "aveTime1[nPhotons]/F") ;
+  chain -> Branch("aveTimeErr1",  treeVars.aveTimeErr1,           "aveTimeErr1[nPhotons]/F") ;
  
   chain -> Branch("vtxNTracks",       treeVars.vtxNTracks,   "vtxNTracks[nVertices]/I");
   chain -> Branch("vtxChi2",          treeVars.vtxChi2,      "vtxChi2[nVertices]/F");
@@ -226,10 +234,14 @@ void initializeBranches(TTree* chain, Ntuple& treeVars)
       treeVars.phoHcalIso[i] = -1 ;
       treeVars.phoTrkIso[i]  = -1 ;
       treeVars.phoHoverE[i]  = -1 ;
-      treeVars.seedTime[i]   = -25 ;
-      treeVars.aveTime[i]    = -25 ;
       treeVars.sMinPho[i]    = -1 ;
       treeVars.sMajPho[i]    = -1 ;
+      treeVars.seedTime[i]   = -25 ;
+      treeVars.seedTimeErr[i] = -25 ;
+      treeVars.aveTime[i]     = -25 ;
+      treeVars.aveTimeErr[i]  = -25 ;
+      treeVars.aveTime1[i]    = -25 ;
+      treeVars.aveTimeErr1[i] = -25 ;
   }
   for(int i=0; i<MAXVTX; i++) {
       treeVars.vtxNTracks[i]=0;

@@ -8,6 +8,7 @@ void setBranchAddresses(TTree* chain, Ntuple& treeVars)
   chain -> SetBranchAddress("bx",          &treeVars.bx);
   chain -> SetBranchAddress("eventId",     &treeVars.eventId);
   chain -> SetBranchAddress("triggered",   &treeVars.triggered);
+  chain -> SetBranchAddress("L1a",         &treeVars.L1a );
   
   // PAT VARIABLES
   chain -> SetBranchAddress("nMuons",      &treeVars.nMuons     );
@@ -64,6 +65,8 @@ void setBranchAddresses(TTree* chain, Ntuple& treeVars)
   chain -> SetBranchAddress("phoEcalIso",   treeVars.phoEcalIso ) ;
   chain -> SetBranchAddress("phoHcalIso",   treeVars.phoHcalIso ) ;
   chain -> SetBranchAddress("phoTrkIso",    treeVars.phoTrkIso ) ;
+  chain -> SetBranchAddress("dR_TrkPho",    treeVars.dR_TrkPho ) ;
+  chain -> SetBranchAddress("pt_TrkPho",    treeVars.pt_TrkPho ) ;
   chain -> SetBranchAddress("phoHoverE",    treeVars.phoHoverE ) ;
   chain -> SetBranchAddress("sMinPho",      treeVars.sMinPho ) ;
   chain -> SetBranchAddress("sMajPho",      treeVars.sMajPho ) ;
@@ -97,6 +100,7 @@ void setBranches(TTree* chain, Ntuple& treeVars)
   chain -> Branch("bx",            &treeVars.bx,                      "bx/i");
   chain -> Branch("eventId",       &treeVars.eventId,            "eventId/i");
   chain -> Branch("triggered",     &treeVars.triggered,        "triggered/I");
+  chain -> Branch("L1a",           &treeVars.L1a,              "L1a/I");
   
   // RECO VARIABLES
   chain -> Branch("nMuons",      &treeVars.nMuons,               "nMuons/I");
@@ -142,6 +146,8 @@ void setBranches(TTree* chain, Ntuple& treeVars)
   chain -> Branch("phoEcalIso",   treeVars.phoEcalIso,            "phoEcalIso[nPhotons]/F") ;
   chain -> Branch("phoHcalIso",   treeVars.phoHcalIso,            "phoHcalIso[nPhotons]/F") ;
   chain -> Branch("phoTrkIso",    treeVars.phoTrkIso,             "phoTrkIso[nPhotons]/F") ;
+  chain -> Branch("dR_TrkPho",    treeVars.dR_TrkPho,             "dR_TrkPho[nPhotons]/F") ;
+  chain -> Branch("pt_TrkPho",    treeVars.pt_TrkPho,             "pt_TrkPho[nPhotons]/F") ;
   chain -> Branch("phoHoverE",    treeVars.phoHoverE,             "phoHoverE[nPhotons]/F") ;
   chain -> Branch("sMinPho",      treeVars.sMinPho,               "sMinPho[nPhotons]/F") ;
   chain -> Branch("sMajPho",      treeVars.sMajPho,               "sMajPho[nPhotons]/F") ;
@@ -185,6 +191,7 @@ void initializeBranches(TTree* chain, Ntuple& treeVars)
   treeVars.bx = 0;
   treeVars.eventId = 0; 
   treeVars.triggered = 0; 
+  treeVars.L1a = 0; 
   
   treeVars.nJets      = 0 ; 
   treeVars.nElectrons = 0 ; 
@@ -233,6 +240,8 @@ void initializeBranches(TTree* chain, Ntuple& treeVars)
       treeVars.phoEcalIso[i] = -1 ;
       treeVars.phoHcalIso[i] = -1 ;
       treeVars.phoTrkIso[i]  = -1 ;
+      treeVars.dR_TrkPho[i]  = -1 ;
+      treeVars.pt_TrkPho[i]  = -1 ;
       treeVars.phoHoverE[i]  = -1 ;
       treeVars.sMinPho[i]    = -1 ;
       treeVars.sMajPho[i]    = -1 ;

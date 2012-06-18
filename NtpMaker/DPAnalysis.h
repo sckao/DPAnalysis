@@ -62,6 +62,17 @@
 
 #include "DataFormats/METReco/interface/BeamHaloSummary.h"
 
+#include "DataFormats/TrackReco/interface/Track.h"
+#include "DataFormats/TrackReco/interface/TrackFwd.h"
+
+// L1 Trigger 
+#include "CondFormats/L1TObjects/interface/L1GtTriggerMenu.h"
+#include "CondFormats/DataRecord/interface/L1GtTriggerMenuRcd.h"
+#include "CondFormats/DataRecord/interface/EcalIntercalibConstantsRcd.h"
+#include "DataFormats/L1GlobalTrigger/interface/L1GlobalTriggerReadoutSetupFwd.h"
+#include "DataFormats/L1GlobalTrigger/interface/L1GlobalTriggerReadoutSetup.h"
+#include "DataFormats/L1GlobalTrigger/interface/L1GlobalTriggerReadoutRecord.h"
+
 // for ECAL cluster
 #include "DataFormats/EgammaReco/interface/BasicCluster.h"
 #include "DataFormats/EgammaReco/interface/BasicClusterFwd.h"
@@ -113,12 +124,13 @@ class DPAnalysis : public edm::EDAnalyzer {
 
       bool EventSelection( const edm::Event& iEvent );
 
-      int  TriggerSelection( const edm::Event& iEvent, int cutVal, string str_head = "HLT_Photon", string str_body = "_CaloIdVL_IsoL" ) ;
-      bool TriggerSelection( const edm::Event& iEvent ) ;
+      bool L1TriggerSelection( const edm::Event& iEvent, const edm::EventSetup& iSetup ) ;
+
+      bool TriggerSelection( const edm::Event& iEvent, int RunID ) ;
  
       bool VertexSelection( edm::Handle<reco::VertexCollection> vtx ) ;
 
-      bool PhotonSelection(  edm::Handle<reco::PhotonCollection> photons, edm::Handle<EcalRecHitCollection> recHitsEB, edm::Handle<EcalRecHitCollection> recHitsEE, vector<const reco::Photon*>& selectedPhotons ) ;
+      bool PhotonSelection(  edm::Handle<reco::PhotonCollection> photons, edm::Handle<EcalRecHitCollection> recHitsEB, edm::Handle<EcalRecHitCollection> recHitsEE, edm::Handle<reco::TrackCollection> tracks, vector<const reco::Photon*>& selectedPhotons ) ;
 
       pair<double,double> ClusterTime( reco::SuperClusterRef scRef, edm::Handle<EcalRecHitCollection> recHitsEB, edm::Handle<EcalRecHitCollection> recHitsEE ) ;
       void ClusterTime( reco::SuperClusterRef scRef, edm::Handle<EcalRecHitCollection> recHitsEB, edm::Handle<EcalRecHitCollection> recHitsEE, double& aveTime, double& aveTimeErr ) ;
@@ -150,6 +162,7 @@ class DPAnalysis : public edm::EDAnalyzer {
       string rootFileName;
       std::vector<string> triggerPatent ;
       bool isData ;
+      string l1GTSource ;
 
       edm::InputTag trigSource;
       edm::InputTag pvSource;
@@ -159,6 +172,7 @@ class DPAnalysis : public edm::EDAnalyzer {
       edm::InputTag photonSource;
       edm::InputTag metSource;
       edm::InputTag jetSource;
+      edm::InputTag trackSource;
 
       edm::InputTag EBRecHitCollection;
       edm::InputTag EERecHitCollection;
@@ -186,6 +200,7 @@ class DPAnalysis : public edm::EDAnalyzer {
       bool passEvent ;
       int counter[10] ; 
       float sMin_ ;
+      int runID_ ;
 
       timeCorrector theTimeCorrector_;
       edm::Timestamp eventTime ;

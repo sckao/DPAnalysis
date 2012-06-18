@@ -19,7 +19,8 @@ struct Ntuple
   unsigned int bx;
   unsigned int eventId;
   int triggered ;
-  
+  int L1a;  
+
   // vertex variables
   int   nVertices;
   float vtxNTracks[MAXVTX];
@@ -73,6 +74,8 @@ struct Ntuple
   float phoEcalIso[MAXPHO];
   float phoHcalIso[MAXPHO];
   float phoTrkIso[MAXPHO];
+  float dR_TrkPho[MAXPHO];
+  float pt_TrkPho[MAXPHO];
   float phoHoverE[MAXPHO];
   float sMinPho[MAXPHO];
   float sMajPho[MAXPHO];

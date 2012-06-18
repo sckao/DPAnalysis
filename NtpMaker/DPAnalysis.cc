@@ -35,6 +35,7 @@ DPAnalysis::DPAnalysis(const edm::ParameterSet& iConfig){
    //now do what ever initialization is needed
    rootFileName         = iConfig.getUntrackedParameter<string> ("rootFileName");
    trigSource           = iConfig.getParameter<edm::InputTag> ("trigSource");
+   l1GTSource           = iConfig.getParameter<string> ("L1GTSource");
    pvSource             = iConfig.getParameter<edm::InputTag> ("pvSource");
    beamSpotSource       = iConfig.getParameter<edm::InputTag> ("beamSpotSource");
    muonSource           = iConfig.getParameter<edm::InputTag> ("muonSource");
@@ -42,6 +43,7 @@ DPAnalysis::DPAnalysis(const edm::ParameterSet& iConfig){
    photonSource         = iConfig.getParameter<edm::InputTag> ("photonSource");
    metSource            = iConfig.getParameter<edm::InputTag> ("metSource");
    jetSource            = iConfig.getParameter<edm::InputTag> ("jetSource");
+   trackSource          = iConfig.getParameter<edm::InputTag> ("trackSource");
 
    EBRecHitCollection   = iConfig.getParameter<edm::InputTag> ("EBRecHitCollection") ;
    EERecHitCollection   = iConfig.getParameter<edm::InputTag> ("EERecHitCollection") ;
@@ -73,7 +75,7 @@ DPAnalysis::DPAnalysis(const edm::ParameterSet& iConfig){
    // initialize the time corrector
    theTimeCorrector_.initEB("EB");
    theTimeCorrector_.initEE("EElow");
-
+   runID_ = 0 ;
 }
 
 
@@ -118,7 +120,6 @@ void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
    leaves.orbit       = iEvent.orbitNumber();
    leaves.runId       = iEvent.id ().run () ;
    leaves.eventId     = iEvent.id ().event () ;
-
   /* 
    Handle<std::vector< PileupSummaryInfo > >  PupInfo;
    iEvent.getByLabel(pileupSource, PupInfo);
@@ -131,7 +132,12 @@ void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
    if (counter[0] == 0 )  PrintTriggers( iEvent ) ;
 
    counter[0]++ ;  
-   bool passTrigger = TriggerSelection( iEvent ) ;
+   int run_id    = iEvent.id().run()  ;
+   bool passL1   = L1TriggerSelection( iEvent, iSetup ) ;
+   bool passHLT  = TriggerSelection( iEvent, run_id ) ;
+
+   //bool passTrigger = ( passL1 || passHLT ) ;
+   bool passTrigger = passHLT  ;
 
    if ( passTrigger ) counter[1]++ ;  
 
@@ -159,6 +165,7 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent ) {
    Handle<reco::PFMETCollection>       met; 
    Handle<EcalRecHitCollection>        recHitsEB ;
    Handle<EcalRecHitCollection>        recHitsEE ;
+   Handle<reco::TrackCollection>       tracks; 
 
    iEvent.getByLabel( trigSource,     triggers );
    iEvent.getByLabel( pvSource,       recVtxs  );
@@ -170,6 +177,7 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent ) {
    iEvent.getByLabel( EBRecHitCollection,     recHitsEB );
    iEvent.getByLabel( EERecHitCollection,     recHitsEE );
    iEvent.getByLabel("BeamHaloSummary", beamHaloSummary) ;
+   iEvent.getByLabel( trackSource,    tracks  );
 
    bool passEvent = true ;
 
@@ -179,8 +187,8 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent ) {
    if ( passEvent )   counter[3]++ ;  
 
    selectedPhotons.clear() ;
-   PhotonSelection( photons, recHitsEB, recHitsEE, selectedPhotons ) ;
-   if ( selectedPhotons.size() < (size_t)photonCuts[5] )  passEvent = false ;
+   PhotonSelection( photons, recHitsEB, recHitsEE, tracks, selectedPhotons ) ;
+   if ( selectedPhotons.size() < (size_t)photonCuts[6] )  passEvent = false ;
    if ( passEvent )   counter[4]++ ;  
 
    //sMinorSelection( selectedPhotons, recHitsEB, recHitsEE ) ;
@@ -231,12 +239,36 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent ) {
 }
 
 // current used method 
-bool DPAnalysis::TriggerSelection( const edm::Event& iEvent ) {
+
+bool DPAnalysis::L1TriggerSelection( const edm::Event& iEvent, const edm::EventSetup& iSetup ) {
+
+    // Get L1 Trigger menu
+    edm::ESHandle<L1GtTriggerMenu> menuRcd;
+    iSetup.get<L1GtTriggerMenuRcd>().get(menuRcd) ;
+    const L1GtTriggerMenu* menu = menuRcd.product();
+    // Get L1 Trigger record  
+    edm::Handle< L1GlobalTriggerReadoutRecord > gtRecord;
+    iEvent.getByLabel( edm::InputTag("gtDigis"), gtRecord);
+    // Get dWord after masking disabled bits
+    const DecisionWord dWord = gtRecord->decisionWord();
+ 
+   bool l1_accepted = menu->gtAlgorithmResult( l1GTSource , dWord);
+   //int passL1 =  ( l1SingleEG22 ) ? 1 : 0 ; 
+
+   //cout<<" pass L1 EG22 ? "<<  passL1 <<endl ;
+   if ( l1_accepted ) leaves.L1a = 1 ;
+
+   return l1_accepted ;
+}
+
+bool DPAnalysis::TriggerSelection( const edm::Event& iEvent, int RunId ) {
 
    bool pass =false ;
    Handle<edm::TriggerResults> triggers;
    iEvent.getByLabel( trigSource, triggers );
    const edm::TriggerNames& trgNameList = iEvent.triggerNames( *triggers );
+
+   if ( runID_ != RunId )  firedTrig.clear();
 
    uint32_t trgbits = 0 ;
    if ( firedTrig.size() == 0 ) { 
@@ -245,60 +277,30 @@ bool DPAnalysis::TriggerSelection( const edm::Event& iEvent ) {
           // loop through desired triggers
           for ( size_t j=0; j< triggerPatent.size(); j++ )  {
               if ( strncmp( tName.c_str(), triggerPatent[j].c_str(), triggerPatent[j].size() ) ==0 ) {
-		 cout<<" Trigger Found : "<< tName <<" accepted ? "<< triggers->accept(i) <<endl;
                  firedTrig.push_back(i);
-		 pass = ( triggers->accept(i) == 1 ) ? true : false ;
-                 if ( pass) trgbits |= ( 1 << j) ;
+                 if ( triggers->accept(i) == 1 ) trgbits |= ( 1 << j) ;
+		 //cout<<" Trigger Found ("<<i <<"):  "<<tName <<" accepted ? "<< triggers->accept(i) ;
+                 //cout<<" form "<< firedTrig.size()<<" triggers "<<endl;
               }
           }
       }
+      runID_ = RunId ;
    } else {
 
           for ( size_t i=0; i< firedTrig.size(); i++ ) {
-              pass = ( triggers->accept( firedTrig[i] ) == 1 ) ? true : false ;
-              if ( pass) trgbits |= ( 1 << i) ;
-              //if ( pass ) cout<<" Trigger Found : "<< firedTrig[i] <<" trigbit = "<< trgbits << endl; 
+              if ( triggers->accept( firedTrig[i] ) == 1  ) trgbits |= ( 1 << i) ;
+              //cout<<" Trigger Found : "<< firedTrig[i] <<" pass ? "<< triggers->accept( firedTrig[i] ) <<" trigbit = "<< trgbits << endl; 
           }
    } 
 
-   if (  pass ) leaves.triggered    =  (int)(trgbits) ;
-   if ( !pass ) leaves.triggered    =  0 ;
+   if ( trgbits != 0 ) {
+      leaves.triggered = (int)(trgbits) ;
+      pass = true ;
+   }
+
    return pass ;
 }
 
-int DPAnalysis::TriggerSelection( const edm::Event& iEvent, int cutVal, string str_head, string str_body ) {
-
-   Handle<edm::TriggerResults> triggers;
-   iEvent.getByLabel( trigSource, triggers );
-
-   cout<<" ** Trigger size = "<< triggers->size() <<endl;
-   const edm::TriggerNames& trgNames = iEvent.triggerNames( *triggers );
-
-   int cutSize = ( cutVal > 99 ) ? 3 : 2 ;
-   int trgWordSize = str_head.size() + str_body.size() + cutSize + 3 ; //  3 -> _vX
-
-   int trgResult = -1 ;
-   int trgResultSum = 0 ;
-   for ( size_t i =0 ; i < trgNames.size(); i++ ) {
-       string tName  = trgNames.triggerName( i );
-       if  ( (int) tName.size() < trgWordSize ) continue ;
-       string strhead = tName.substr(0, str_head.size() ) ;
-       string strPt   = tName.substr( str_head.size() , cutSize ) ;
-       int cutPt      =  atoi ( strPt.c_str() ) ;
-       string strbody = tName.substr( str_head.size() + cutSize , str_body.size() ) ;
-       string strend = tName.substr( trgWordSize-3 ,3) ;
-       if ( strhead == str_head && strbody == str_body && cutPt >= cutVal) {
-          int trgIndex  = trgNames.triggerIndex(tName);
-          int accept    = triggers->accept(trgIndex);
-          if ( accept == 1 ) trgResult = cutPt ; 
-          if ( accept == 0 ) trgResult = 0 ; 
-          
-          if ( accept == 1 ) trgResultSum += cutPt ; 
-          cout<<" -> "<< strhead << cutPt << strbody << strend <<" = "<< trgResult <<"  sum = "<<trgResultSum <<endl;
-       }
-   } 
-   return trgResult ;
-}
 
 void DPAnalysis::PrintTriggers( const edm::Event& iEvent ) {
 
@@ -354,7 +356,7 @@ bool DPAnalysis::VertexSelection( Handle<reco::VertexCollection> vtx ) {
      return hasGoodVertex ;
 }
 
-bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle<EcalRecHitCollection> recHitsEB, Handle<EcalRecHitCollection> recHitsEE, vector<const reco::Photon*>& selectedPhotons ) {
+bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle<EcalRecHitCollection> recHitsEB, Handle<EcalRecHitCollection> recHitsEE, Handle<reco::TrackCollection> tracks, vector<const reco::Photon*>& selectedPhotons ) {
 
    int k= 0 ;
    for(reco::PhotonCollection::const_iterator it = photons->begin(); it != photons->end(); it++) {
@@ -363,6 +365,8 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
        if ( it->pt() < photonCuts[0] || fabs( it->eta() ) > photonCuts[1] ) continue ;
        float hcalIsoRatio = it->hcalTowerSumEtConeDR04() / it->pt() ;
        if  ( ( hcalIsoRatio + it->hadronicOverEm() )*it->energy() >= 6.0 ) continue ;
+       // pixel veto
+       if ( it->hasPixelSeed() ) continue ;
  
        // S_Minor Cuts from the seed cluster
        reco::CaloClusterPtr SCseed = it->superCluster()->seed() ;
@@ -380,7 +384,7 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
        float seedTime    = (float)seedRH->time();
        float seedTimeErr = (float)seedRH->timeError();
       
-       if ( sMaj > photonCuts[2] ) continue ;
+       if ( sMaj  > photonCuts[2] ) continue ;
        if ( sMin <= photonCuts[3] || sMin >= photonCuts[4] ) continue ;
 
        // Isolation Cuts 
@@ -392,6 +396,25 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
        bool ecalIso = ( (ecalSumEt / it->energy()) < photonIso[2] && ecalSumEt < photonIso[1] ) ; 
        bool hcalIso = ( (hcalSumEt / it->energy()) < photonIso[4] && hcalSumEt < photonIso[3] ) ; 
        if ( !trkIso || !ecalIso || !hcalIso ) continue ;
+
+       // Track Veto 
+       int nTrk = 0 ;
+       double minDR = 99. ;
+       double trkPt = 0 ;
+       for (reco::TrackCollection::const_iterator itrk = tracks->begin(); itrk != tracks->end(); itrk++ )  {
+           if ( itrk->pt() < 3. ) continue ;
+	   LorentzVector trkP4( itrk->px(), itrk->py(), itrk->pz(), itrk->p() ) ;
+	   double dR =  ROOT::Math::VectorUtil::DeltaR( trkP4 , it->p4()  ) ;
+           if ( dR < minDR ) {
+              minDR = dR ;
+              trkPt = itrk->pt() ;
+           }
+	   if ( dR < photonCuts[5] )  nTrk++ ;
+       }
+       if ( nTrk > 0 ) continue ;
+
+
+       // Timing Calculation
        pair<double,double> AveXtalTE =  ClusterTime( it->superCluster(), recHitsEB , recHitsEE );
        double aveXtalTime    = AveXtalTE.first ;
        double aveXtalTimeErr = AveXtalTE.second ;
@@ -409,12 +432,14 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
        leaves.phoEcalIso[k] = ecalSumEt ;
        leaves.phoHcalIso[k] = hcalSumEt ;
        leaves.phoTrkIso[k]  = trkSumPt ;
+       leaves.dR_TrkPho[k]  = minDR ;
+       leaves.pt_TrkPho[k]  = trkPt ;
 
-       leaves.sMinPho[k] = sMin ;
-       leaves.sMajPho[k] = sMaj ;
+       leaves.sMinPho[k]  = sMin ;
+       leaves.sMajPho[k]  = sMaj ;
        leaves.seedTime[k] = seedTime ;
-       leaves.seedTimeErr[k] = seedTimeErr ;
-       leaves.aveTime[k]  = aveXtalTime ;
+       leaves.seedTimeErr[k]  = seedTimeErr ;
+       leaves.aveTime[k]      = aveXtalTime ;
        leaves.aveTimeErr[k]   = aveXtalTimeErr ;
        leaves.aveTime1[k]     =  AveXtalTE.first ;
        leaves.aveTimeErr1[k]  =  AveXtalTE.second ;
@@ -577,6 +602,7 @@ void DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitColl
   aveTimeErr = 1. / sqrt( xtimeErr) ;
 
 }
+
 
 bool DPAnalysis::JetSelection( Handle<reco::PFJetCollection> jets, vector<const reco::Photon*>& selectedPhotons, 
                                vector<const reco::PFJet*>& selectedJets) {

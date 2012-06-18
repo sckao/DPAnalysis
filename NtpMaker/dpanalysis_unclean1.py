@@ -4,13 +4,14 @@ process = cms.Process("Demo")
 
 process.load("FWCore.MessageService.MessageLogger_cfi")
 
-process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(10000) )
+process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(-1) )
 
 process.source = cms.Source("PoolSource",
     # replace 'myfile.root' with the source file you want to use
     fileNames = cms.untracked.vstring(
         #'dcache:/pnfs/cms/WAX/11/store/data/Run2012A/Photon/AOD/PromptReco-v1/000/191/247/002CDB97-4588-E111-8BF4-003048D37694.root',
        'dcache:/pnfs/cms/WAX/11/store/data/Run2012B/SinglePhoton/RECO/PromptReco-v1/000/193/998/10950429-439D-E111-B454-BCAEC5329705.root'
+       #'dcache:/pnfs/cms/WAX/11/store/data/Run2012B/SingleMu/RECO/PromptReco-v1/000/194/151/020D9700-FE9F-E111-9535-002481E0E56C.root'
 
         #'dcache:/pnfs/cms/WAX/11/store/data/Run2012A/Photon/AOD/PromptReco-v1/000/191/247/069259D0-2C88-E111-9729-5404A63886C3.root'
         #'dcache:/pnfs/cms/WAX/11/store/data/Run2011B/Photon/AOD/PromptReco-v1/000/179/558/5886DB5E-A5FF-E011-92AE-BCAEC5364CFB.root'
@@ -33,14 +34,17 @@ process.options   = cms.untracked.PSet(
 
 
 process.ana = cms.EDAnalyzer('DPAnalysis',
-    rootFileName     = cms.untracked.string('Photon_2011B_test.root'),
+    rootFileName     = cms.untracked.string('Photon_2012B_test.root'),
     #triggerName      = cms.untracked.string('HLT_Photon50_CaloIdVL_IsoL'),
-    triggerName      = cms.vstring('HLT_Photon50_CaloIdVL_IsoL','HLT_DisplacedPhoton65_CaloIdVL_IsoL_PFMET25'),
+    #triggerName      = cms.vstring('HLT_IsoMu30_v', 'HLT_DisplacedPhoton65_CaloIdVL_IsoL_PFMET25'),
+    triggerName      = cms.vstring('HLT_Photon50_CaloIdVL_IsoL', 'HLT_DisplacedPhoton65_CaloIdVL_IsoL_PFMET25'),
+    L1GTSource       = cms.string('L1_SingleEG22'),
     isData           = cms.untracked.bool(True),
     trigSource = cms.InputTag("TriggerResults","","HLT"),
     jetSource   = cms.InputTag("ak5PFJets"),
     metSource   = cms.InputTag("pfMet"),
     muonSource  = cms.InputTag("muons"),
+    trackSource = cms.InputTag("generalTracks"),
     electronSource   = cms.InputTag("gsfElectrons"),
     photonSource     = cms.InputTag("myphotons"),
     pvSource         = cms.InputTag("offlinePrimaryVerticesWithBS"),
@@ -53,8 +57,8 @@ process.ana = cms.EDAnalyzer('DPAnalysis',
     # Set up cuts for physics objects
     # vertex cuts                z   ndof   d0 
     vtxCuts       = cms.vdouble( 99,    0,  99 ),
-    # photon cuts                pt   eta  sMajMax,  sMinMin, sMinMax,  Num  
-    photonCuts    = cms.vdouble( 45,  2.4,    999.,      0.0,     99.,    1  ),
+    # photon cuts                pt   eta  sMajMax,  sMinMin, sMinMax, trkVeto  Num  
+    photonCuts    = cms.vdouble( 45,  2.4,    999.,      0.0,     99.,    0.05,   1  ),
     # photon isolation           trk,  ecalSumEt, ecalR, hcalSumEt, hcalR 
     photonIso     = cms.vdouble(  0.2,       4.5,   0.1,       4.0,   0.1 ),
     # jet cuts                   pt    eta    dR,  nJets

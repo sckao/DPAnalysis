@@ -4,13 +4,14 @@ process = cms.Process("Demo")
 
 process.load("FWCore.MessageService.MessageLogger_cfi")
 
-process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(-1) )
+process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32( -1 ) )
 
 process.source = cms.Source("PoolSource",
     # replace 'myfile.root' with the source file you want to use
     fileNames = cms.untracked.vstring(
         #'dcache:/pnfs/cms/WAX/11/store/data/Run2012A/Photon/AOD/PromptReco-v1/000/191/247/002CDB97-4588-E111-8BF4-003048D37694.root',
        'dcache:/pnfs/cms/WAX/11/store/data/Run2012B/SinglePhoton/RECO/PromptReco-v1/000/193/998/10950429-439D-E111-B454-BCAEC5329705.root'
+       #'dcache:/pnfs/cms/WAX/11/store/data/Run2012B/MET/RECO/PromptReco-v1/000/195/552/04EA349F-5DB1-E111-A002-E0CB4E553651.root' 
        #'dcache:/pnfs/cms/WAX/11/store/data/Run2012B/SingleMu/RECO/PromptReco-v1/000/194/151/020D9700-FE9F-E111-9535-002481E0E56C.root'
 
         #'dcache:/pnfs/cms/WAX/11/store/data/Run2012A/Photon/AOD/PromptReco-v1/000/191/247/069259D0-2C88-E111-9729-5404A63886C3.root'
@@ -37,7 +38,7 @@ process.ana = cms.EDAnalyzer('DPAnalysis',
     rootFileName     = cms.untracked.string('Photon_2012B_test.root'),
     #triggerName      = cms.untracked.string('HLT_Photon50_CaloIdVL_IsoL'),
     #triggerName      = cms.vstring('HLT_IsoMu30_v', 'HLT_DisplacedPhoton65_CaloIdVL_IsoL_PFMET25'),
-    triggerName      = cms.vstring('HLT_Photon50_CaloIdVL_IsoL', 'HLT_DisplacedPhoton65_CaloIdVL_IsoL_PFMET25'),
+    triggerName      = cms.vstring('HLT_MET120_HBHENoiseCleaned', 'HLT_DisplacedPhoton65_CaloIdVL_IsoL_PFMET25'),
     L1GTSource       = cms.string('L1_SingleEG22'),
     isData           = cms.untracked.bool(True),
     trigSource = cms.InputTag("TriggerResults","","HLT"),

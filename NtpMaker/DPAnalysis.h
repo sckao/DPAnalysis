@@ -126,7 +126,9 @@ class DPAnalysis : public edm::EDAnalyzer {
 
       bool L1TriggerSelection( const edm::Event& iEvent, const edm::EventSetup& iSetup ) ;
 
-      bool TriggerSelection( const edm::Event& iEvent, int RunID ) ;
+      void TriggerTagging( edm::Handle<edm::TriggerResults> triggers, const edm::TriggerNames& trgNameList, int RunID, vector<int>& firedTrig ) ;
+      bool TriggerSelection( edm::Handle<edm::TriggerResults> triggers, vector<int> firedTrig ) ;
+      //bool TriggerSelection( const edm::Event& iEvent, int RunID ) ;
  
       bool VertexSelection( edm::Handle<reco::VertexCollection> vtx ) ;
 
@@ -206,6 +208,7 @@ class DPAnalysis : public edm::EDAnalyzer {
       edm::Timestamp eventTime ;
 
       std::vector<int> firedTrig ;
+      //std::vector<int> firedTrigID ;
       ///string TriggerName ;
 
 };

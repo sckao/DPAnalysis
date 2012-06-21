@@ -69,6 +69,8 @@ DPAnalysis::DPAnalysis(const edm::ParameterSet& iConfig){
    setBranches( theTree, leaves ) ;
 
    firedTrig.clear() ;
+   for ( size_t i=0; i< triggerPatent.size(); i++ ) firedTrig.push_back(-1) ;  
+
    // reset the counter
    for ( int i=0; i< 10 ; i++) counter[i] = 0 ;
 
@@ -120,7 +122,8 @@ void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
    leaves.orbit       = iEvent.orbitNumber();
    leaves.runId       = iEvent.id ().run () ;
    leaves.eventId     = iEvent.id ().event () ;
-  /* 
+
+   /* 
    Handle<std::vector< PileupSummaryInfo > >  PupInfo;
    iEvent.getByLabel(pileupSource, PupInfo);
 
@@ -133,8 +136,15 @@ void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
 
    counter[0]++ ;  
    int run_id    = iEvent.id().run()  ;
-   bool passL1   = L1TriggerSelection( iEvent, iSetup ) ;
-   bool passHLT  = TriggerSelection( iEvent, run_id ) ;
+   L1TriggerSelection( iEvent, iSetup ) ;
+
+   Handle<edm::TriggerResults> triggers;
+   iEvent.getByLabel( trigSource, triggers );
+   const edm::TriggerNames& trgNameList = iEvent.triggerNames( *triggers ) ;
+
+   // trigger analysis
+   TriggerTagging( triggers, trgNameList, run_id, firedTrig ) ;
+   bool passHLT = TriggerSelection( triggers, firedTrig ) ;
 
    //bool passTrigger = ( passL1 || passHLT ) ;
    bool passTrigger = passHLT  ;
@@ -238,8 +248,6 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent ) {
    return passEvent ;
 }
 
-// current used method 
-
 bool DPAnalysis::L1TriggerSelection( const edm::Event& iEvent, const edm::EventSetup& iSetup ) {
 
     // Get L1 Trigger menu
@@ -261,37 +269,37 @@ bool DPAnalysis::L1TriggerSelection( const edm::Event& iEvent, const edm::EventS
    return l1_accepted ;
 }
 
-bool DPAnalysis::TriggerSelection( const edm::Event& iEvent, int RunId ) {
+void DPAnalysis::TriggerTagging( Handle<edm::TriggerResults> triggers, const edm::TriggerNames& trgNameList, int RunId, vector<int>& firedTrig ) {
 
-   bool pass =false ;
-   Handle<edm::TriggerResults> triggers;
-   iEvent.getByLabel( trigSource, triggers );
-   const edm::TriggerNames& trgNameList = iEvent.triggerNames( *triggers );
+   if ( runID_ != RunId )  {
+      for (size_t j=0; j< triggerPatent.size(); j++ ) firedTrig[j] = -1;
 
-   if ( runID_ != RunId )  firedTrig.clear();
-
-   uint32_t trgbits = 0 ;
-   if ( firedTrig.size() == 0 ) { 
+      // loop through trigger menu
       for ( size_t i =0 ; i < trgNameList.size(); i++ ) {
           string tName  = trgNameList.triggerName( i );
           // loop through desired triggers
           for ( size_t j=0; j< triggerPatent.size(); j++ )  {
               if ( strncmp( tName.c_str(), triggerPatent[j].c_str(), triggerPatent[j].size() ) ==0 ) {
-                 firedTrig.push_back(i);
-                 if ( triggers->accept(i) == 1 ) trgbits |= ( 1 << j) ;
-		 //cout<<" Trigger Found ("<<i <<"):  "<<tName <<" accepted ? "<< triggers->accept(i) ;
-                 //cout<<" form "<< firedTrig.size()<<" triggers "<<endl;
+                  firedTrig[j] = i;
+                 cout<<" Trigger Found ("<<j <<"):  "<<tName ;
+                 cout<<" Idx: "<< i <<" triggers "<<endl;
               }
           }
       }
       runID_ = RunId ;
-   } else {
+   }
 
-          for ( size_t i=0; i< firedTrig.size(); i++ ) {
-              if ( triggers->accept( firedTrig[i] ) == 1  ) trgbits |= ( 1 << i) ;
-              //cout<<" Trigger Found : "<< firedTrig[i] <<" pass ? "<< triggers->accept( firedTrig[i] ) <<" trigbit = "<< trgbits << endl; 
-          }
-   } 
+}
+
+// current used method 
+bool DPAnalysis::TriggerSelection( Handle<edm::TriggerResults> triggers, vector<int> firedTrigID ) {
+
+   bool pass =false ;
+   uint32_t trgbits = 0 ;
+   for ( size_t i=0; i< firedTrigID.size(); i++ ) {
+       if ( triggers->accept( firedTrigID[i] ) == 1  ) trgbits |= ( 1 << i ) ;
+       //`cout<<" ("<< i <<") Trigger Found : "<< firedTrigID[i] <<" pass ? "<< triggers->accept( firedTrigID[i] ) <<" trigbit = "<< trgbits << endl; 
+   }
 
    if ( trgbits != 0 ) {
       leaves.triggered = (int)(trgbits) ;
@@ -300,7 +308,6 @@ bool DPAnalysis::TriggerSelection( const edm::Event& iEvent, int RunId ) {
 
    return pass ;
 }
-
 
 void DPAnalysis::PrintTriggers( const edm::Event& iEvent ) {
 
@@ -363,8 +370,8 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
        // fiducial cuts
        if ( k >= MAXPHO ) break ;
        if ( it->pt() < photonCuts[0] || fabs( it->eta() ) > photonCuts[1] ) continue ;
-       float hcalIsoRatio = it->hcalTowerSumEtConeDR04() / it->pt() ;
-       if  ( ( hcalIsoRatio + it->hadronicOverEm() )*it->energy() >= 6.0 ) continue ;
+       //float hcalIsoRatio = it->hcalTowerSumEtConeDR04() / it->pt() ;
+       //if  ( ( hcalIsoRatio + it->hadronicOverEm() )*it->energy() >= 6.0 ) continue ;
        // pixel veto
        if ( it->hasPixelSeed() ) continue ;
  
@@ -466,6 +473,7 @@ pair<double,double> DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle
   // 1. loop all the basic clusters 
   for ( reco::CaloCluster_iterator  clus = scRef->clustersBegin() ;  clus != scRef->clustersEnd();  ++clus) {
 
+      if ( *clus != scRef->seed() ) continue ;
       // GFdoc clusterDetIds holds crystals that participate to this basic cluster 
       // 2. loop on xtals in cluster
       std::vector<std::pair<DetId, float> > clusterDetIds = (*clus)->hitsAndFractions() ; //get these from the cluster
@@ -539,6 +547,7 @@ void DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitColl
 
   for ( reco::CaloCluster_iterator  clus = scRef->clustersBegin() ;  clus != scRef->clustersEnd();  ++clus) {
 
+      if ( *clus != scRef->seed() ) continue ;
       // GFdoc clusterDetIds holds crystals that participate to this basic cluster 
       //loop on xtals in cluster
       std::vector<std::pair<DetId, float> > clusterDetIds = (*clus)->hitsAndFractions() ; //get these from the cluster

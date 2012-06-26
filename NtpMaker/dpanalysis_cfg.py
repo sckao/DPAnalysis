@@ -4,7 +4,7 @@ process = cms.Process("Demo")
 
 process.load("FWCore.MessageService.MessageLogger_cfi")
 
-process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(10000) )
+process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(-1) )
 
 process.source = cms.Source("PoolSource",
     # replace 'myfile.root' with the source file you want to use
@@ -12,14 +12,19 @@ process.source = cms.Source("PoolSource",
         #'dcache:/pnfs/cms/WAX/11/store/data/Run2012A/Photon/AOD/PromptReco-v1/000/191/247/002CDB97-4588-E111-8BF4-003048D37694.root',
         #'dcache:/pnfs/cms/WAX/11/store/data/Run2012A/Photon/AOD/PromptReco-v1/000/191/247/069259D0-2C88-E111-9729-5404A63886C3.root'
         #'dcache:/pnfs/cms/WAX/11/store/data/Run2012A/Photon/AOD/PromptReco-v1/000/191/247/'
-        'dcache:/pnfs/cms/WAX/11/store/data/Run2011B/Photon/AOD/PromptReco-v1/000/179/558/5886DB5E-A5FF-E011-92AE-BCAEC5364CFB.root'
+        #'dcache:/pnfs/cms/WAX/11/store/data/Run2011B/Photon/AOD/PromptReco-v1/000/179/558/5886DB5E-A5FF-E011-92AE-BCAEC5364CFB.root'
+        'dcache:/pnfs/cms/WAX/resilient/sckao/GMSB_FastSim/GMSB_L100_CTau1000_1.root',
+        'dcache:/pnfs/cms/WAX/resilient/sckao/GMSB_FastSim/GMSB_L100_CTau1000_2.root'
     )
 )
+process.source.duplicateCheckMode = cms.untracked.string('noDuplicateCheck')
 
-process.ana = cms.EDAnalyzer('DPAnalysis',
-    rootFileName     = cms.untracked.string('Photon_2011B_test.root'),
-    triggerName      = cms.untracked.string('HLT_Photon75_CaloIdVL_IsoL'),
-    isData           = cms.untracked.bool(True),
+process.demo = cms.EDAnalyzer('DPAnalysis',
+    rootFileName     = cms.untracked.string('MC_test.root'),
+    triggerName      = cms.vstring('HLT_L1SingleEG12', 'HLT_DisplacedPhoton65_CaloIdVL_IsoL_PFMET25'),
+    L1GTSource       = cms.string('L1_SingleEG22'),
+    L1Select         = cms.bool( True ),
+    isData           = cms.bool(True),
     trigSource = cms.InputTag("TriggerResults","","HLT"),
     jetSource   = cms.InputTag("ak5PFJets"),
     metSource   = cms.InputTag("pfMet"),
@@ -51,4 +56,4 @@ process.ana = cms.EDAnalyzer('DPAnalysis',
 )
 
 
-process.p = cms.Path(process.ana)
+process.p = cms.Path(process.demo)

@@ -76,6 +76,7 @@ void setBranchAddresses(TTree* chain, Ntuple& treeVars)
   chain -> SetBranchAddress("aveTimeErr",   treeVars.aveTimeErr ) ;
   chain -> SetBranchAddress("aveTime1",     treeVars.aveTime1 ) ;
   chain -> SetBranchAddress("aveTimeErr1",  treeVars.aveTimeErr1 ) ;
+  chain -> SetBranchAddress("timeChi2",     treeVars.timeChi2 ) ;
 
   chain -> SetBranchAddress("genPx",        treeVars.genPx       );
   chain -> SetBranchAddress("genPy",        treeVars.genPy       );
@@ -157,6 +158,7 @@ void setBranches(TTree* chain, Ntuple& treeVars)
   chain -> Branch("aveTimeErr",   treeVars.aveTimeErr,            "aveTimeErr[nPhotons]/F") ;
   chain -> Branch("aveTime1",     treeVars.aveTime1,              "aveTime1[nPhotons]/F") ;
   chain -> Branch("aveTimeErr1",  treeVars.aveTimeErr1,           "aveTimeErr1[nPhotons]/F") ;
+  chain -> Branch("timeChi2",     treeVars.timeChi2,              "timeChi2[nPhotons]/F") ;
  
   chain -> Branch("vtxNTracks",       treeVars.vtxNTracks,   "vtxNTracks[nVertices]/I");
   chain -> Branch("vtxChi2",          treeVars.vtxChi2,      "vtxChi2[nVertices]/F");
@@ -251,6 +253,7 @@ void initializeBranches(TTree* chain, Ntuple& treeVars)
       treeVars.aveTimeErr[i]  = -25 ;
       treeVars.aveTime1[i]    = -25 ;
       treeVars.aveTimeErr1[i] = -25 ;
+      treeVars.timeChi2[i]    = -1 ;
   }
   for(int i=0; i<MAXVTX; i++) {
       treeVars.vtxNTracks[i]=0;

@@ -38,9 +38,10 @@ process.ana = cms.EDAnalyzer('DPAnalysis',
     rootFileName     = cms.untracked.string('Photon_2012B_test.root'),
     #triggerName      = cms.untracked.string('HLT_Photon50_CaloIdVL_IsoL'),
     #triggerName      = cms.vstring('HLT_IsoMu30_v', 'HLT_DisplacedPhoton65_CaloIdVL_IsoL_PFMET25'),
-    triggerName      = cms.vstring('HLT_MET120_HBHENoiseCleaned', 'HLT_DisplacedPhoton65_CaloIdVL_IsoL_PFMET25'),
+    triggerName      = cms.vstring('HLT_L1SingleEG12', 'HLT_DisplacedPhoton65_CaloIdVL_IsoL_PFMET25'),
     L1GTSource       = cms.string('L1_SingleEG22'),
-    isData           = cms.untracked.bool(True),
+    L1Select         = cms.bool( True ),
+    isData           = cms.bool(True),
     trigSource = cms.InputTag("TriggerResults","","HLT"),
     jetSource   = cms.InputTag("ak5PFJets"),
     metSource   = cms.InputTag("pfMet"),
@@ -99,6 +100,7 @@ process.uncleanSCRecovered.cleanScCollection=cms.InputTag ("correctedHybridSuper
 # myPhoton sequence
 process.load("RecoEgamma.PhotonIdentification.photonId_cff")
 process.load("RecoLocalCalo.EcalRecAlgos.EcalSeverityLevelESProducer_cfi")
+#process.ecalSeverityLevel.timeThresh = cms.double(2.0)
 
 import RecoEgamma.EgammaPhotonProducers.photonCore_cfi
 import RecoEgamma.EgammaPhotonProducers.photons_cfi

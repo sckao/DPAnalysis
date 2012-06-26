@@ -59,7 +59,8 @@ DPAnalysis::DPAnalysis(const edm::ParameterSet& iConfig){
    muonCuts             = iConfig.getParameter<std::vector<double> >("muonCuts");  
    //triggerPatent        = iConfig.getUntrackedParameter<string> ("triggerName");
    triggerPatent        = iConfig.getParameter< std::vector<string> >("triggerName");
-   isData               = iConfig.getUntrackedParameter<bool> ("isData");
+   isData               = iConfig.getParameter<bool> ("isData");
+   L1Select             = iConfig.getParameter<bool> ("L1Select");
 
    gen = new GenStudy( iConfig );
 
@@ -134,20 +135,22 @@ void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
 
    if (counter[0] == 0 )  PrintTriggers( iEvent ) ;
 
-   counter[0]++ ;  
    int run_id    = iEvent.id().run()  ;
-   L1TriggerSelection( iEvent, iSetup ) ;
 
+   counter[0]++ ;  
+   // L1 Trigger Selection
+   bool passL1 = L1TriggerSelection( iEvent, iSetup ) ;
+
+   // HLT trigger analysis
    Handle<edm::TriggerResults> triggers;
    iEvent.getByLabel( trigSource, triggers );
    const edm::TriggerNames& trgNameList = iEvent.triggerNames( *triggers ) ;
 
-   // trigger analysis
    TriggerTagging( triggers, trgNameList, run_id, firedTrig ) ;
    bool passHLT = TriggerSelection( triggers, firedTrig ) ;
 
-   //bool passTrigger = ( passL1 || passHLT ) ;
-   bool passTrigger = passHLT  ;
+   // Using L1 or HLT to select events ?!
+   bool passTrigger = ( L1Select ) ? passL1 : passHLT  ;
 
    if ( passTrigger ) counter[1]++ ;  
 
@@ -425,10 +428,16 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
        pair<double,double> AveXtalTE =  ClusterTime( it->superCluster(), recHitsEB , recHitsEE );
        double aveXtalTime    = AveXtalTE.first ;
        double aveXtalTimeErr = AveXtalTE.second ;
+       double nChi2          = 0 ; 
        //cout<<" 1st xT : "<< aveXtalTime <<"  xTE : "<< aveXtalTimeErr << endl;
-       ClusterTime( it->superCluster(), recHitsEB , recHitsEE, aveXtalTime, aveXtalTimeErr );
+       // Only use the seed cluster
+       ClusterTime( it->superCluster(), recHitsEB , recHitsEE, aveXtalTime, aveXtalTimeErr, nChi2 );
        //cout<<" 2nd xT : "<< aveXtalTime <<"  xTE : "<< aveXtalTimeErr << endl;
-       ClusterTime( it->superCluster(), recHitsEB , recHitsEE, aveXtalTime, aveXtalTimeErr );
+       double aveXtalTimeA    = aveXtalTime ;
+       double aveXtalTimeErrA = aveXtalTimeErr ;
+       double nChi2A          = 0 ; 
+       // use all clusters
+       ClusterTime( it->superCluster(), recHitsEB , recHitsEE, aveXtalTimeA, aveXtalTimeErrA, nChi2A, true );
        //cout<<" 3rd xT : "<< aveXtalTime <<"  xTE : "<< aveXtalTimeErr << endl;
 
        leaves.phoPx[k] = it->p4().Px() ;
@@ -441,15 +450,16 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
        leaves.phoTrkIso[k]  = trkSumPt ;
        leaves.dR_TrkPho[k]  = minDR ;
        leaves.pt_TrkPho[k]  = trkPt ;
+       leaves.sMinPho[k]    = sMin ;
+       leaves.sMajPho[k]    = sMaj ;
 
-       leaves.sMinPho[k]  = sMin ;
-       leaves.sMajPho[k]  = sMaj ;
-       leaves.seedTime[k] = seedTime ;
+       leaves.seedTime[k]     = seedTime ;
        leaves.seedTimeErr[k]  = seedTimeErr ;
-       leaves.aveTime[k]      = aveXtalTime ;
-       leaves.aveTimeErr[k]   = aveXtalTimeErr ;
-       leaves.aveTime1[k]     =  AveXtalTE.first ;
-       leaves.aveTimeErr1[k]  =  AveXtalTE.second ;
+       leaves.aveTime[k]      = aveXtalTimeA ;        // weighted ave. time of all clusters
+       leaves.aveTimeErr[k]   = aveXtalTimeErrA ;
+       leaves.aveTime1[k]     = AveXtalTE.first ;    // weighted ave. time of seed cluster
+       leaves.aveTimeErr1[k]  = AveXtalTE.second ;
+       leaves.timeChi2[k]     = nChi2 ;
 
        selectedPhotons.push_back( &(*it) ) ;
        k++ ;
@@ -462,6 +472,7 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
 
 }
 
+// return time, timeError
 pair<double,double> DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitCollection> recHitsEB, Handle<EcalRecHitCollection> recHitsEE ) {
 
   const EcalIntercalibConstantMap& icalMap = ical->getMap();
@@ -473,6 +484,7 @@ pair<double,double> DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle
   // 1. loop all the basic clusters 
   for ( reco::CaloCluster_iterator  clus = scRef->clustersBegin() ;  clus != scRef->clustersEnd();  ++clus) {
 
+      // only use seed basic cluster  
       if ( *clus != scRef->seed() ) continue ;
       // GFdoc clusterDetIds holds crystals that participate to this basic cluster 
       // 2. loop on xtals in cluster
@@ -537,17 +549,20 @@ pair<double,double> DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle
 
 }
 
-void DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitCollection> recHitsEB, Handle<EcalRecHitCollection> recHitsEE, double& aveTime, double& aveTimeErr ) {
+// re-calculate time and timeError as well as normalized chi2
+void DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitCollection> recHitsEB, Handle<EcalRecHitCollection> recHitsEE, double& aveTime, double& aveTimeErr, double& nChi2, bool useAllClusters ) {
 
   const EcalIntercalibConstantMap& icalMap = ical->getMap();
   float adcToGeV = float(agc->getEBValue());
 
   double xtime = 0 ;
   double xtimeErr = 0 ;
-
+  double chi2_bc = 0 ;
+  double ndof = 0 ;
   for ( reco::CaloCluster_iterator  clus = scRef->clustersBegin() ;  clus != scRef->clustersEnd();  ++clus) {
 
-      if ( *clus != scRef->seed() ) continue ;
+      // only use seed basic cluster  
+      if ( *clus != scRef->seed() && !useAllClusters ) continue ;
       // GFdoc clusterDetIds holds crystals that participate to this basic cluster 
       //loop on xtals in cluster
       std::vector<std::pair<DetId, float> > clusterDetIds = (*clus)->hitsAndFractions() ; //get these from the cluster
@@ -599,16 +614,22 @@ void DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitColl
              // get time error 
              double xtimeErr_ = ( myhit.isTimeErrorValid() ) ?  myhit.timeError() : 999999 ;
 
-             // removed un-qualified hits 
+             // calculate chi2 for the BC of the seed
+             double chi2_x = pow( (thistime - aveTime / xtimeErr_ ) , 2 ) ; 
+             chi2_bc += chi2_x ;
+             ndof += 1 ;
+             // remove un-qualified hits 
              if ( fabs ( thistime - aveTime) > 3.*aveTimeErr  ) continue ;
  
              xtime     += thistime / pow( xtimeErr_ , 2 ) ;
              xtimeErr  += 1/ pow( xtimeErr_ , 2 ) ;
       }
   }
-   // update ave. time and error
+
+  // update ave. time and error
   aveTime    = xtime / xtimeErr ;
   aveTimeErr = 1. / sqrt( xtimeErr) ;
+  nChi2      = ( ndof != 0 ) ? chi2_bc / ndof : 9999999 ;     
 
 }
 

@@ -300,6 +300,7 @@ bool DPAnalysis::TriggerSelection( Handle<edm::TriggerResults> triggers, vector<
    bool pass =false ;
    uint32_t trgbits = 0 ;
    for ( size_t i=0; i< firedTrigID.size(); i++ ) {
+       if ( firedTrigID[i] == -1 ) continue ; 
        if ( triggers->accept( firedTrigID[i] ) == 1  ) trgbits |= ( 1 << i ) ;
        //`cout<<" ("<< i <<") Trigger Found : "<< firedTrigID[i] <<" pass ? "<< triggers->accept( firedTrigID[i] ) <<" trigbit = "<< trgbits << endl; 
    }
@@ -460,7 +461,7 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
        leaves.aveTime1[k]     = AveXtalTE.first ;    // weighted ave. time of seed cluster
        leaves.aveTimeErr1[k]  = AveXtalTE.second ;
        leaves.timeChi2[k]     = nChi2 ;
-
+ 
        selectedPhotons.push_back( &(*it) ) ;
        k++ ;
    }
@@ -489,6 +490,8 @@ pair<double,double> DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle
       // GFdoc clusterDetIds holds crystals that participate to this basic cluster 
       // 2. loop on xtals in cluster
       std::vector<std::pair<DetId, float> > clusterDetIds = (*clus)->hitsAndFractions() ; //get these from the cluster
+      //cout<<" --------------- "<<endl ;
+      int nXtl = 0 ;
       for (std::vector<std::pair<DetId, float> >::const_iterator detitr = clusterDetIds.begin () ; 
            detitr != clusterDetIds.end () ; ++detitr) { 
 
@@ -511,6 +514,15 @@ pair<double,double> DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle
              // SIC Feb 14 2011 -- Add check on RecHit flags (takes care of spike cleaning in 42X)
              if ( !( myhit.checkFlag(EcalRecHit::kGood) || myhit.checkFlag(EcalRecHit::kOutOfTime) || 
                     myhit.checkFlag(EcalRecHit::kPoorCalib)  ) )  continue;
+
+             // swiss cross cleaning 
+             float swissX = (isEB) ? EcalTools::swissCross(detitr->first, *recHitsEB , 0.5, true ) : 
+                                     EcalTools::swissCross(detitr->first, *recHitsEE , 0.5, true ) ;
+             nXtl++ ;
+             if ( swissX > 0.95 ) { 
+                //cout<<" swissX = "<< swissX <<" @ "<< nXtl <<endl ;
+                continue ;
+             }
 
              // thisamp is the EB amplitude of the current rechit
 	     double thisamp  = myhit.energy () ;
@@ -541,6 +553,7 @@ pair<double,double> DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle
              xtime     += thistime / pow( xtimeErr_ , 2 ) ;
              xtimeErr  += 1/ pow( xtimeErr_ , 2 ) ;
       }
+      //cout<<" total Xtl = " << nXtl << endl ;
   }
   double wAveTime = xtime / xtimeErr ;
   double wAveTimeErr = 1. / sqrt( xtimeErr) ;
@@ -587,6 +600,11 @@ void DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitColl
              // SIC Feb 14 2011 -- Add check on RecHit flags (takes care of spike cleaning in 42X)
              if ( !( myhit.checkFlag(EcalRecHit::kGood) || myhit.checkFlag(EcalRecHit::kOutOfTime) || 
                     myhit.checkFlag(EcalRecHit::kPoorCalib)  ) )  continue;
+
+             // swiss cross cleaning 
+             float swissX = (isEB) ? EcalTools::swissCross(detitr->first, *recHitsEB , 0.5, true ) : 
+                                     EcalTools::swissCross(detitr->first, *recHitsEE , 0.5, true ) ;
+             if ( swissX > 0.95 ) continue ;
 
              // thisamp is the EB amplitude of the current rechit
 	     double thisamp  = myhit.energy () ;

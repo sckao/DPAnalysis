@@ -114,6 +114,19 @@ using namespace std ;
 //
 typedef std::pair<reco::SuperClusterRef, float> ParticleSC  ;
 
+struct PhoInfo {
+
+  double t    ;
+  double dt   ;
+  double nchi2  ;
+  double fSpike ;
+  double maxSX  ;
+  int    nxtals ;  
+  int    nBC    ;
+
+
+} ;
+
 
 class DPAnalysis : public edm::EDAnalyzer {
    public:
@@ -135,7 +148,8 @@ class DPAnalysis : public edm::EDAnalyzer {
       bool PhotonSelection(  edm::Handle<reco::PhotonCollection> photons, edm::Handle<EcalRecHitCollection> recHitsEB, edm::Handle<EcalRecHitCollection> recHitsEE, edm::Handle<reco::TrackCollection> tracks, vector<const reco::Photon*>& selectedPhotons ) ;
 
       pair<double,double> ClusterTime( reco::SuperClusterRef scRef, edm::Handle<EcalRecHitCollection> recHitsEB, edm::Handle<EcalRecHitCollection> recHitsEE ) ;
-      void ClusterTime( reco::SuperClusterRef scRef, edm::Handle<EcalRecHitCollection> recHitsEB, edm::Handle<EcalRecHitCollection> recHitsEE, double& aveTime, double& aveTimeErr, double& nChi2, bool useAllClusters = false ) ;
+      void ClusterTime( reco::SuperClusterRef scRef, edm::Handle<EcalRecHitCollection> recHitsEB, edm::Handle<EcalRecHitCollection> recHitsEE, PhoInfo& phoTmp, bool useAllClusters = false ) ;
+      //void ClusterTime( reco::SuperClusterRef scRef, edm::Handle<EcalRecHitCollection> recHitsEB, edm::Handle<EcalRecHitCollection> recHitsEE, double& aveTime, double& aveTimeErr, double& nChi2, bool useAllClusters = false ) ;
 
       bool JetSelection( edm::Handle<reco::PFJetCollection> jets, vector<const reco::Photon*>& selectedPhotons,
                                                                      vector<const reco::PFJet*>& selectedJets ) ;

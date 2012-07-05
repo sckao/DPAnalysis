@@ -371,6 +371,7 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
 
    int k= 0 ;
    for(reco::PhotonCollection::const_iterator it = photons->begin(); it != photons->end(); it++) {
+
        // fiducial cuts
        if ( k >= MAXPHO ) break ;
        if ( it->pt() < photonCuts[0] || fabs( it->eta() ) > photonCuts[1] ) continue ;
@@ -427,18 +428,25 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
 
        // Timing Calculation
        pair<double,double> AveXtalTE =  ClusterTime( it->superCluster(), recHitsEB , recHitsEE );
-       double aveXtalTime    = AveXtalTE.first ;
-       double aveXtalTimeErr = AveXtalTE.second ;
-       double nChi2          = 0 ; 
+
+       PhoInfo phoTmp ;
+       phoTmp.t      = AveXtalTE.first ;
+       phoTmp.dt     = AveXtalTE.second ;
+       phoTmp.nchi2  = 0 ;
+       phoTmp.fSpike = -1 ;
+       phoTmp.nxtals = 0 ;
+       phoTmp.nBC    = 0 ;
+       phoTmp.maxSX  = 0 ;
        //cout<<" 1st xT : "<< aveXtalTime <<"  xTE : "<< aveXtalTimeErr << endl;
        // Only use the seed cluster
-       ClusterTime( it->superCluster(), recHitsEB , recHitsEE, aveXtalTime, aveXtalTimeErr, nChi2 );
+       ClusterTime( it->superCluster(), recHitsEB , recHitsEE, phoTmp );
        //cout<<" 2nd xT : "<< aveXtalTime <<"  xTE : "<< aveXtalTimeErr << endl;
-       double aveXtalTimeA    = aveXtalTime ;
-       double aveXtalTimeErrA = aveXtalTimeErr ;
-       double nChi2A          = 0 ; 
+       leaves.aveTime1[k]     = phoTmp.t ;    // weighted ave. time of seed cluster
+       leaves.aveTimeErr1[k]  = phoTmp.dt ;
+       leaves.timeChi2[k]     = phoTmp.nchi2 ;
+
        // use all clusters
-       ClusterTime( it->superCluster(), recHitsEB , recHitsEE, aveXtalTimeA, aveXtalTimeErrA, nChi2A, true );
+       ClusterTime( it->superCluster(), recHitsEB , recHitsEE, phoTmp, true );
        //cout<<" 3rd xT : "<< aveXtalTime <<"  xTE : "<< aveXtalTimeErr << endl;
 
        leaves.phoPx[k] = it->p4().Px() ;
@@ -456,12 +464,13 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
 
        leaves.seedTime[k]     = seedTime ;
        leaves.seedTimeErr[k]  = seedTimeErr ;
-       leaves.aveTime[k]      = aveXtalTimeA ;        // weighted ave. time of all clusters
-       leaves.aveTimeErr[k]   = aveXtalTimeErrA ;
-       leaves.aveTime1[k]     = AveXtalTE.first ;    // weighted ave. time of seed cluster
-       leaves.aveTimeErr1[k]  = AveXtalTE.second ;
-       leaves.timeChi2[k]     = nChi2 ;
- 
+       leaves.aveTime[k]      = phoTmp.t ;       // weighted ave. time of all clusters
+       leaves.aveTimeErr[k]   = phoTmp.dt ;
+       leaves.nXtals[k]       = phoTmp.nxtals ;
+       leaves.nBC[k]          = phoTmp.nBC ;
+       leaves.fSpike[k]       = phoTmp.fSpike ;
+       leaves.maxSwissX[k]    = phoTmp.maxSX ; 
+
        selectedPhotons.push_back( &(*it) ) ;
        k++ ;
    }
@@ -516,13 +525,19 @@ pair<double,double> DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle
                     myhit.checkFlag(EcalRecHit::kPoorCalib)  ) )  continue;
 
              // swiss cross cleaning 
-             float swissX = (isEB) ? EcalTools::swissCross(detitr->first, *recHitsEB , 0.5, true ) : 
-                                     EcalTools::swissCross(detitr->first, *recHitsEE , 0.5, true ) ;
-             nXtl++ ;
+             float swissX = (isEB) ? EcalTools::swissCross(detitr->first, *recHitsEB , 0., true ) : 
+                                     EcalTools::swissCross(detitr->first, *recHitsEE , 0., true ) ;
+             if ( myhit.checkFlag(EcalRecHit::kWeird) || myhit.checkFlag(EcalRecHit::kDiWeird) ) continue ;
+
+             //if ( myhit.checkFlag(EcalRecHit::kWeird) || myhit.checkFlag(EcalRecHit::kDiWeird) ) {
+             //   cout<<" spike = "<< swissX <<" @ "<< nXtl <<endl ;
+             //} 
+
              if ( swissX > 0.95 ) { 
                 //cout<<" swissX = "<< swissX <<" @ "<< nXtl <<endl ;
                 continue ;
              }
+             nXtl++ ;
 
              // thisamp is the EB amplitude of the current rechit
 	     double thisamp  = myhit.energy () ;
@@ -563,19 +578,29 @@ pair<double,double> DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle
 }
 
 // re-calculate time and timeError as well as normalized chi2
-void DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitCollection> recHitsEB, Handle<EcalRecHitCollection> recHitsEE, double& aveTime, double& aveTimeErr, double& nChi2, bool useAllClusters ) {
+//void DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitCollection> recHitsEB, Handle<EcalRecHitCollection> recHitsEE, double& aveTime, double& aveTimeErr, double& nChi2, bool useAllClusters ) {
+
+void DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitCollection> recHitsEB, Handle<EcalRecHitCollection> recHitsEE, PhoInfo& phoTmp, bool useAllClusters ) {
 
   const EcalIntercalibConstantMap& icalMap = ical->getMap();
   float adcToGeV = float(agc->getEBValue());
 
-  double xtime = 0 ;
+  double xtime    = 0 ;
   double xtimeErr = 0 ;
-  double chi2_bc = 0 ;
-  double ndof = 0 ;
+  double chi2_bc  = 0 ;
+  double ndof     = 0 ;
+  double maxSwissX = 0 ;
+  int    nBC      = 0 ;
+  int    nXtl     = 0 ;
+  int    nSpike   = 0 ; 
+  int    nSeedXtl = 0 ;
   for ( reco::CaloCluster_iterator  clus = scRef->clustersBegin() ;  clus != scRef->clustersEnd();  ++clus) {
 
+      nBC++ ;
       // only use seed basic cluster  
+      bool isSeed = ( *clus == scRef->seed() ) ;
       if ( *clus != scRef->seed() && !useAllClusters ) continue ;
+
       // GFdoc clusterDetIds holds crystals that participate to this basic cluster 
       //loop on xtals in cluster
       std::vector<std::pair<DetId, float> > clusterDetIds = (*clus)->hitsAndFractions() ; //get these from the cluster
@@ -601,9 +626,14 @@ void DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitColl
              if ( !( myhit.checkFlag(EcalRecHit::kGood) || myhit.checkFlag(EcalRecHit::kOutOfTime) || 
                     myhit.checkFlag(EcalRecHit::kPoorCalib)  ) )  continue;
 
+             //if ( myhit.checkFlag(EcalRecHit::kWeird) || myhit.checkFlag(EcalRecHit::kDiWeird) ) continue ;
+
              // swiss cross cleaning 
-             float swissX = (isEB) ? EcalTools::swissCross(detitr->first, *recHitsEB , 0.5, true ) : 
-                                     EcalTools::swissCross(detitr->first, *recHitsEE , 0.5, true ) ;
+             float swissX = (isEB) ? EcalTools::swissCross(detitr->first, *recHitsEB , 0., true ) : 
+                                     EcalTools::swissCross(detitr->first, *recHitsEE , 0., true ) ;
+             maxSwissX = ( isSeed && swissX  > maxSwissX ) ? swissX : maxSwissX ;
+             if ( swissX > 0.95 && isSeed ) nSpike++  ;
+             if ( isSeed                  ) nSeedXtl++  ;
              if ( swissX > 0.95 ) continue ;
 
              // thisamp is the EB amplitude of the current rechit
@@ -633,21 +663,26 @@ void DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitColl
              double xtimeErr_ = ( myhit.isTimeErrorValid() ) ?  myhit.timeError() : 999999 ;
 
              // calculate chi2 for the BC of the seed
-             double chi2_x = pow( (thistime - aveTime / xtimeErr_ ) , 2 ) ; 
+             double chi2_x = pow( (thistime - phoTmp.t / xtimeErr_ ) , 2 ) ; 
              chi2_bc += chi2_x ;
              ndof += 1 ;
              // remove un-qualified hits 
-             if ( fabs ( thistime - aveTime) > 3.*aveTimeErr  ) continue ;
+             if ( fabs ( thistime - phoTmp.t ) > 3.*phoTmp.dt ) continue ;
  
              xtime     += thistime / pow( xtimeErr_ , 2 ) ;
              xtimeErr  += 1/ pow( xtimeErr_ , 2 ) ;
+             nXtl++ ;
       }
   }
 
   // update ave. time and error
-  aveTime    = xtime / xtimeErr ;
-  aveTimeErr = 1. / sqrt( xtimeErr) ;
-  nChi2      = ( ndof != 0 ) ? chi2_bc / ndof : 9999999 ;     
+  phoTmp.t     = xtime / xtimeErr ;
+  phoTmp.dt    = 1. / sqrt( xtimeErr) ;
+  phoTmp.nchi2 = ( ndof != 0 ) ? chi2_bc / ndof : 9999999 ;     
+  phoTmp.fSpike = ( nSeedXtl > 0 ) ? nSpike / nSeedXtl : -1 ;
+  phoTmp.nxtals = nXtl ;
+  phoTmp.nBC    = nBC ;
+  phoTmp.maxSX  = maxSwissX ;
 
 }
 

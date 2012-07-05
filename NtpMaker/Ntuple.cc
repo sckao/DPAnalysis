@@ -77,6 +77,10 @@ void setBranchAddresses(TTree* chain, Ntuple& treeVars)
   chain -> SetBranchAddress("aveTime1",     treeVars.aveTime1 ) ;
   chain -> SetBranchAddress("aveTimeErr1",  treeVars.aveTimeErr1 ) ;
   chain -> SetBranchAddress("timeChi2",     treeVars.timeChi2 ) ;
+  chain -> SetBranchAddress("nXtals",       treeVars.nXtals ) ;
+  chain -> SetBranchAddress("fSpike",       treeVars.fSpike ) ;
+  chain -> SetBranchAddress("maxSwissX",    treeVars.maxSwissX ) ;
+  chain -> SetBranchAddress("nBC",          treeVars.nBC ) ;
 
   chain -> SetBranchAddress("genPx",        treeVars.genPx       );
   chain -> SetBranchAddress("genPy",        treeVars.genPy       );
@@ -159,6 +163,10 @@ void setBranches(TTree* chain, Ntuple& treeVars)
   chain -> Branch("aveTime1",     treeVars.aveTime1,              "aveTime1[nPhotons]/F") ;
   chain -> Branch("aveTimeErr1",  treeVars.aveTimeErr1,           "aveTimeErr1[nPhotons]/F") ;
   chain -> Branch("timeChi2",     treeVars.timeChi2,              "timeChi2[nPhotons]/F") ;
+  chain -> Branch("fSpike",       treeVars.fSpike,                "fSpike[nPhotons]/I"  ) ;
+  chain -> Branch("maxSwissX",    treeVars.maxSwissX,             "maxSwissX[nPhotons]/I"  ) ;
+  chain -> Branch("nXtals",       treeVars.nXtals,                "nXtals[nPhotons]/I"  ) ;
+  chain -> Branch("nBC",          treeVars.nBC,                   "nBC[nPhotons]/I"  ) ;
  
   chain -> Branch("vtxNTracks",       treeVars.vtxNTracks,   "vtxNTracks[nVertices]/I");
   chain -> Branch("vtxChi2",          treeVars.vtxChi2,      "vtxChi2[nVertices]/F");
@@ -254,6 +262,10 @@ void initializeBranches(TTree* chain, Ntuple& treeVars)
       treeVars.aveTime1[i]    = -25 ;
       treeVars.aveTimeErr1[i] = -25 ;
       treeVars.timeChi2[i]    = -1 ;
+      treeVars.fSpike[i]      = -1 ;
+      treeVars.maxSwissX[i]   = 0 ;
+      treeVars.nXtals[i]      = 0 ;
+      treeVars.nBC[i]         = 0 ;
   }
   for(int i=0; i<MAXVTX; i++) {
       treeVars.vtxNTracks[i]=0;

@@ -86,6 +86,11 @@ struct Ntuple
   float aveTimeErr[MAXPHO];
   float aveTimeErr1[MAXPHO];
   float timeChi2[MAXPHO] ;
+  float fSpike[MAXPHO] ;
+  float maxSwissX[MAXPHO] ;
+  int   nXtals[MAXPHO] ;
+  int   nBC[MAXPHO] ;
+
 
   // Gen Particle information
   int nGen ; 

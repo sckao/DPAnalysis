@@ -16,6 +16,7 @@ void setBranchAddresses(TTree* chain, Ntuple& treeVars)
   chain -> SetBranchAddress("nJets",       &treeVars.nJets      );
   chain -> SetBranchAddress("nPhotons",    &treeVars.nPhotons   );
   chain -> SetBranchAddress("nVertices",   &treeVars.nVertices  );
+  chain -> SetBranchAddress("totalNVtx",   &treeVars.totalNVtx  );
   chain -> SetBranchAddress("nGen",        &treeVars.nGen       );
 
   chain -> SetBranchAddress("metPx",       &treeVars.metPx     );
@@ -113,6 +114,7 @@ void setBranches(TTree* chain, Ntuple& treeVars)
   chain -> Branch("nJets",       &treeVars.nJets,                "nJets/I");
   chain -> Branch("nPhotons",    &treeVars.nPhotons,             "nPhotons/I");
   chain -> Branch("nVertices",   &treeVars.nVertices,            "nVertices/I");
+  chain -> Branch("totalNVtx",   &treeVars.totalNVtx,            "totalNVtx/I");
   chain -> Branch("nGen",        &treeVars.nGen,                 "nGen/I");
 
   chain -> Branch("metPx",       &treeVars.metPx,                "metPx/F");
@@ -163,8 +165,8 @@ void setBranches(TTree* chain, Ntuple& treeVars)
   chain -> Branch("aveTime1",     treeVars.aveTime1,              "aveTime1[nPhotons]/F") ;
   chain -> Branch("aveTimeErr1",  treeVars.aveTimeErr1,           "aveTimeErr1[nPhotons]/F") ;
   chain -> Branch("timeChi2",     treeVars.timeChi2,              "timeChi2[nPhotons]/F") ;
-  chain -> Branch("fSpike",       treeVars.fSpike,                "fSpike[nPhotons]/I"  ) ;
-  chain -> Branch("maxSwissX",    treeVars.maxSwissX,             "maxSwissX[nPhotons]/I"  ) ;
+  chain -> Branch("fSpike",       treeVars.fSpike,                "fSpike[nPhotons]/F"  ) ;
+  chain -> Branch("maxSwissX",    treeVars.maxSwissX,             "maxSwissX[nPhotons]/F"  ) ;
   chain -> Branch("nXtals",       treeVars.nXtals,                "nXtals[nPhotons]/I"  ) ;
   chain -> Branch("nBC",          treeVars.nBC,                   "nBC[nPhotons]/I"  ) ;
  
@@ -207,7 +209,8 @@ void initializeBranches(TTree* chain, Ntuple& treeVars)
   treeVars.nElectrons = 0 ; 
   treeVars.nMuons     = 0 ; 
   treeVars.nPhotons   = 0 ; 
-  treeVars.nVertices  = 0;
+  treeVars.nVertices  = 0 ;
+  treeVars.totalNVtx  = 0 ;
   treeVars.nGen       = 0 ; 
 
   treeVars.metPx = 0 ;

@@ -23,6 +23,7 @@ struct Ntuple
 
   // vertex variables
   int   nVertices;
+  int   totalNVtx ;
   float vtxNTracks[MAXVTX];
   float vtxChi2[MAXVTX];
   float vtxNdof[MAXVTX];

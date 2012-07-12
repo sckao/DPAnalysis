@@ -38,7 +38,7 @@ process.ana = cms.EDAnalyzer('DPAnalysis',
     rootFileName     = cms.untracked.string('Photon_2012B_test.root'),
     #triggerName      = cms.untracked.string('HLT_Photon50_CaloIdVL_IsoL'),
     #triggerName      = cms.vstring('HLT_IsoMu30_v', 'HLT_DisplacedPhoton65_CaloIdVL_IsoL_PFMET25'),
-    triggerName      = cms.vstring('HLT_L1SingleEG12', 'HLT_DisplacedPhoton65_CaloIdVL_IsoL_PFMET25'),
+    triggerName      = cms.vstring('HLT_Photon50_CaloIdVL_IsoL', 'HLT_DisplacedPhoton65_CaloIdVL_IsoL_PFMET25'),
     L1GTSource       = cms.string('L1_SingleEG22'),
     L1Select         = cms.bool( True ),
     isData           = cms.bool(True),
@@ -59,8 +59,8 @@ process.ana = cms.EDAnalyzer('DPAnalysis',
     # Set up cuts for physics objects
     # vertex cuts                z   ndof   d0 
     vtxCuts       = cms.vdouble( 99,    0,  99 ),
-    # photon cuts                pt   eta  sMajMax,  sMinMin, sMinMax, trkVeto  Num  
-    photonCuts    = cms.vdouble( 45,  2.4,    999.,      0.0,     99.,    0.05,   1  ),
+    # photon cuts                pt   eta  sMajMax,  sMinMin, sMinMax, trkVeto  Num  leadingPt 
+    photonCuts    = cms.vdouble( 45,  2.4,    999.,      -1,     99.,    0.05,   1 ,     80   ),
     # photon isolation           trk,  ecalSumEt, ecalR, hcalSumEt, hcalR 
     photonIso     = cms.vdouble(  0.2,       4.5,   0.1,       4.0,   0.1 ),
     # jet cuts                   pt    eta    dR,  nJets

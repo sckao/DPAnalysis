@@ -89,6 +89,7 @@ struct Ntuple
   float timeChi2[MAXPHO] ;
   float fSpike[MAXPHO] ;
   float maxSwissX[MAXPHO] ;
+  float seedSwissX[MAXPHO] ;
   int   nXtals[MAXPHO] ;
   int   nBC[MAXPHO] ;
 

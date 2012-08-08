@@ -9,15 +9,16 @@ process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32( -1 ) )
 process.source = cms.Source("PoolSource",
     # replace 'myfile.root' with the source file you want to use
     fileNames = cms.untracked.vstring(
-        #'dcache:/pnfs/cms/WAX/11/store/data/Run2012A/Photon/AOD/PromptReco-v1/000/191/247/002CDB97-4588-E111-8BF4-003048D37694.root',
-       'dcache:/pnfs/cms/WAX/11/store/data/Run2012B/SinglePhoton/RECO/PromptReco-v1/000/193/998/10950429-439D-E111-B454-BCAEC5329705.root'
+       #'dcache:/pnfs/cms/WAX/11/store/data/Run2012B/SinglePhoton/RECO/PromptReco-v1/000/195/530/0CDCB0BB-A8B0-E111-9059-BCAEC518FF8E.root',
+       #'dcache:/pnfs/cms/WAX/11/store/data/Run2012B/SinglePhoton/RECO/PromptReco-v1/000/195/530/14CFC608-B4B0-E111-83C6-0025B32036D2.root'
        #'dcache:/pnfs/cms/WAX/11/store/data/Run2012B/MET/RECO/PromptReco-v1/000/195/552/04EA349F-5DB1-E111-A002-E0CB4E553651.root' 
        #'dcache:/pnfs/cms/WAX/11/store/data/Run2012B/SingleMu/RECO/PromptReco-v1/000/194/151/020D9700-FE9F-E111-9535-002481E0E56C.root'
 
-        #'dcache:/pnfs/cms/WAX/11/store/data/Run2012A/Photon/AOD/PromptReco-v1/000/191/247/069259D0-2C88-E111-9729-5404A63886C3.root'
         #'dcache:/pnfs/cms/WAX/11/store/data/Run2011B/Photon/AOD/PromptReco-v1/000/179/558/5886DB5E-A5FF-E011-92AE-BCAEC5364CFB.root'
-        #'dcache:/pnfs/cms/WAX/resilient/sckao/MC2012/GMSB_L100_CTau1000_8TeV_RECO_10_1_qX9.root'
-        #'dcache:/pnfs/cms/WAX/11/store/data/Run2011A/Photon/AOD/PromptReco-v6/000/173/389/B8BBAB75-A4CA-E011-84BA-BCAEC53296F8.root'
+       'dcache:/pnfs/cms/WAX/11/store/mc/Summer12/GMSB_Lambda-140_CTau-2000_TuneZ2star_8TeV-pythia6/GEN-SIM-RECO/PU_S9_START52_V9-v2/0000/003B2D4F-1C94-E111-B785-002618943976.root',
+       'dcache:/pnfs/cms/WAX/11/store/mc/Summer12/GMSB_Lambda-140_CTau-2000_TuneZ2star_8TeV-pythia6/GEN-SIM-RECO/PU_S9_START52_V9-v2/0000/049FA3DE-1C94-E111-A57E-0026189438A0.root',
+       'dcache:/pnfs/cms/WAX/11/store/mc/Summer12/GMSB_Lambda-140_CTau-2000_TuneZ2star_8TeV-pythia6/GEN-SIM-RECO/PU_S9_START52_V9-v2/0000/069BFC4C-2094-E111-809A-00248C55CC97.root'
+
  
     ),
     # explicitly drop photons resident in AOD/RECO, to make sure only those locally re-made (uncleaned photons) are used
@@ -36,7 +37,6 @@ process.options   = cms.untracked.PSet(
 
 process.ana = cms.EDAnalyzer('DPAnalysis',
     rootFileName     = cms.untracked.string('Photon_2012B_test.root'),
-    #triggerName      = cms.untracked.string('HLT_Photon50_CaloIdVL_IsoL'),
     #triggerName      = cms.vstring('HLT_IsoMu30_v', 'HLT_DisplacedPhoton65_CaloIdVL_IsoL_PFMET25'),
     triggerName      = cms.vstring('HLT_Photon50_CaloIdVL_IsoL', 'HLT_DisplacedPhoton65_CaloIdVL_IsoL_PFMET25'),
     L1GTSource       = cms.string('L1_SingleEG22'),
@@ -60,7 +60,7 @@ process.ana = cms.EDAnalyzer('DPAnalysis',
     # vertex cuts                z   ndof   d0 
     vtxCuts       = cms.vdouble( 99,    0,  99 ),
     # photon cuts                pt   eta  sMajMax,  sMinMin, sMinMax, trkVeto  Num  leadingPt 
-    photonCuts    = cms.vdouble( 45,  2.4,    999.,      -1,     99.,    0.05,   1 ,     80   ),
+    photonCuts    = cms.vdouble( 45,  2.4,    99.,      -1,     99.,    0.,   1 ,     80   ),
     # photon isolation           trk,  ecalSumEt, ecalR, hcalSumEt, hcalR 
     photonIso     = cms.vdouble(  0.2,       4.5,   0.1,       4.0,   0.1 ),
     # jet cuts                   pt    eta    dR,  nJets

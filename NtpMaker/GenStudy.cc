@@ -108,6 +108,7 @@ void GenStudy::GetGenEvent(const edm::Event& iEvent, Ntuple& leaves, bool debug 
 
        double beta  = sqrt( (p4.px()*p4.px()) + (p4.py()*p4.py()) + (p4.pz()*p4.pz()) ) / p4.e() ;
        // trace its children, photon(22) and gravitino(1000039)
+       // looping over the particles at the end vertex of the mother particle
        HepMC::GenVertex* v_out = (*it)->end_vertex() ;
        for ( HepMC::GenVertex::particles_out_const_iterator i1 = v_out->particles_out_const_begin(); i1 != v_out->particles_out_const_end(); i1++) {
            HepMC::GenVertex* v1_out = (*i1)->end_vertex() ;

@@ -79,6 +79,8 @@ DPAnalysis::DPAnalysis(const edm::ParameterSet& iConfig){
    theTimeCorrector_.initEB("EB");
    theTimeCorrector_.initEE("EElow");
    runID_ = 0 ;
+
+   debugT = false ;
 }
 
 
@@ -87,8 +89,8 @@ DPAnalysis::~DPAnalysis()
    // do anything here that needs to be done at desctruction time
 
    delete gen ;
-   cout<<"All:"<< counter[0]<<" Trigger:"<<counter[1]<<" Vertex:"<< counter[2] <<" photon:"<<counter[3] ;
-   cout<<" beamHalo:"<< counter[4] <<" BeamHalo:"<< counter[5] <<" Jet:"<<counter[6] <<" MET:"<<counter[7] <<endl ;
+   cout<<"All:"<< counter[0]<<" Trigger:"<<counter[1]<<" Vertex:"<< counter[2] <<" Photon:"<<counter[3] ;
+   cout<<" beamHalo:"<< counter[4] <<" Jet:"<< counter[5] <<" MET:"<<counter[6] <<" Pre-Selection:"<<counter[7] <<endl ;
 
    theFile->cd () ;
    theTree->Write() ; 
@@ -154,6 +156,7 @@ void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
 
    if ( passTrigger ) counter[1]++ ;  
 
+   // get the generator information
    if ( !isData ) { 
       gen->GetGenEvent( iEvent, leaves );
       //gen->GetGen( iEvent, leaves );
@@ -161,7 +164,8 @@ void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
    //if ( !isData ) gen->PrintGenEvent( iEvent );
 
    bool pass = EventSelection( iEvent ) ;
-   
+   if ( pass && passTrigger ) counter[7]++ ;   
+
    if ( pass && !isData ) theTree->Fill();
    if ( pass && isData && passTrigger ) theTree->Fill();
 }
@@ -203,14 +207,6 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent ) {
    if ( selectedPhotons.size() < (size_t)photonCuts[6] )  passEvent = false ;
    if ( passEvent )   counter[3]++ ;  
 
-   //sMinorSelection( selectedPhotons, recHitsEB, recHitsEE ) ;
-   //if ( selectedPhotons.size() < (size_t)photonCuts[5] )  passEvent = false ;
-   /*
-   if ( passEvent ) {  counter[4]++ ;  
-                       printf("id:%d, nPho:%d, Pt:%.3f sMin:%.6f \n", 
-                iEvent.id().event(), (int)selectedPhotons.size(), selectedPhotons[0]->pt(), sMin_ ) ;
-   }   
-   */
    if( beamHaloSummary.isValid() ) {
      const reco::BeamHaloSummary TheSummary = (*beamHaloSummary.product() ); 
      if( !TheSummary.CSCTightHaloId() && passEvent ) { 
@@ -224,15 +220,13 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent ) {
  
    //IsoPhotonSelection( selectedPhotons ) ;
    //if ( selectedPhotons.size() < photonCuts[5] )  passEvent = false ;
-   if ( passEvent )   counter[5]++ ;  
 
    selectedJets.clear() ;
    JetSelection( jets, selectedPhotons, selectedJets );
    //bool isGammaJets = GammaJetVeto( selectedPhotons, selectedJets ) ;
    //if ( isGammaJets ) passEvent = false ;
    if ( selectedJets.size() < jetCuts[3] )   passEvent = false ;
-   if ( passEvent )   counter[6]++ ;   
-
+   if ( passEvent )   counter[5]++ ;   
    
    selectedElectrons.clear() ;
    ElectronSelection( electrons, selectedElectrons ) ;
@@ -245,7 +239,7 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent ) {
    leaves.metPx = pfMet.px() ;
    leaves.metPy = pfMet.py() ;
    if ( pfMet.pt() < metCuts[0]  ) passEvent = false;
-   if ( passEvent )   counter[7]++ ;  
+   if ( passEvent )   counter[6]++ ;  
 
    return passEvent ;
 }
@@ -400,7 +394,9 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
        EcalRecHitCollection::const_iterator seedRH = rechits->find(seedCrystalId);
        float seedTime    = (float)seedRH->time();
        float seedTimeErr = (float)seedRH->timeError();
+       float swissX = EcalTools::swissCross( seedCrystalId, *rechits , 0., true ) ;
 
+       // sMin and sMaj cuts
        if ( sMaj  > photonCuts[2] ) continue ;
        if ( sMin <= photonCuts[3] || sMin >= photonCuts[4] ) continue ;
 
@@ -446,6 +442,8 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
        phoTmp.maxSX  = -1 ;
        //cout<<" 1st xT : "<< aveXtalTime <<"  xTE : "<< aveXtalTimeErr << endl;
        // Only use the seed cluster
+       //if ( seedTime > 8. ) debugT = true ;
+       if ( debugT ) printf("===== seedT: %.2f, 1st Ave.T: %.2f =====\n", seedTime,  AveXtalTE.first ) ;
        ClusterTime( it->superCluster(), recHitsEB , recHitsEE, phoTmp );
        //cout<<" 2nd xT : "<< aveXtalTime <<"  xTE : "<< aveXtalTimeErr << endl;
        leaves.aveTime1[k]     = phoTmp.t ;    // weighted ave. time of seed cluster
@@ -455,8 +453,10 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
        leaves.nBC[k]          = phoTmp.nBC ;
        leaves.fSpike[k]       = phoTmp.fSpike ;
        leaves.maxSwissX[k]    = phoTmp.maxSX ; 
-
-       // refine the timing 
+       leaves.seedSwissX[k]   = swissX ;
+ 
+       debugT = false ;
+       // refine the timing to exclude out-of-time xtals
        ClusterTime( it->superCluster(), recHitsEB , recHitsEE, phoTmp );
        //cout<<" 3rd xT : "<< aveXtalTime <<"  xTE : "<< aveXtalTimeErr << endl;
 
@@ -475,7 +475,7 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
 
        leaves.seedTime[k]     = seedTime ;
        leaves.seedTimeErr[k]  = seedTimeErr ;
-       leaves.aveTime[k]      = phoTmp.t ;       // weighted ave. time of all clusters
+       leaves.aveTime[k]      = phoTmp.t ;       // weighted ave. time of seed cluster 
        leaves.aveTimeErr[k]   = phoTmp.dt ;
 
        selectedPhotons.push_back( &(*it) ) ;
@@ -667,7 +667,9 @@ void DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitColl
              double xtimeErr_ = ( myhit.isTimeErrorValid() ) ?  myhit.timeError() : 999999 ;
 
              // calculate chi2 for the BC of the seed
-             double chi2_x = pow( (thistime - phoTmp.t / xtimeErr_ ) , 2 ) ; 
+             double chi2_x = pow( ((thistime - phoTmp.t) / xtimeErr_ ) , 2 ) ; 
+             if ( debugT ) printf(" xtal(%d)  t: %.2f, dt: %f,  chi2: %.2f  \n", 
+                                   (int)ndof, thistime, xtimeErr_,  chi2_x );
              chi2_bc += chi2_x ;
              ndof += 1 ;
              // remove un-qualified hits 
@@ -678,7 +680,7 @@ void DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitColl
              nXtl++ ;
       }
   }
-
+  if ( debugT ) printf("--- sum_chi2: %.2f, ndof: %.1f norm_chi2: %.2f ---\n", chi2_bc, ndof, chi2_bc/ndof );
   //cout<<" nSpike = "<<  nSpike <<" nXtl = "<< nSeedXtl <<"  maxSwissX = "<< maxSwissX  << endl ;
   // update ave. time and error
   phoTmp.t     = xtime / xtimeErr ;
@@ -690,8 +692,40 @@ void DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitColl
   phoTmp.maxSX  = maxSwissX ;
 
 }
+/*
+void DPAnalysis::EventTime( const edm::Event& iEvent ) {
+
+   Handle<EcalRecHitCollection>        recHitsEB ;
+   Handle<EcalRecHitCollection>        recHitsEE ;
+   Handle<reco::BasicClusterCollection> EBClusters ;
+   Handle<reco::BasicClusterCollection> EEBClusters ;
+
+   iEvent.getByLabel( EBRecHitCollection,     recHitsEB );
+   iEvent.getByLabel( EERecHitCollection,     recHitsEE );
+   iEvent.getByLabel( EBBasicClusterCollection, EBClusters) ;
+   iEvent.getByLabel( EEBasicClusterCollection, EEClusters) ;
+
+   // Barrel BasicClusters
+   const reco::BasicClusterCollection* theEBClusters = EBClusters.product () ;
+   
+   // Endcap BasicClusters
+   const reco::BasicClusterCollection* theEEClusters = EEClusters.product () ;
+
+   for (reco::BasicClusterCollection::const_iterator it = theEBClusters->begin () ;
+        it != theEBClusters->end ()  ;  ++it)  {
+
+       for (std::vector<std::pair<DetId, float> >::const_iterator detitr = clusterDetIds.begin () ; 
+	      detitr != clusterDetIds.end () ; ++detitr) {// loop on rechics of barrel basic clusters
+
+       }
 
 
+   }
+
+
+
+}
+*/
 bool DPAnalysis::JetSelection( Handle<reco::PFJetCollection> jets, vector<const reco::Photon*>& selectedPhotons, 
                                vector<const reco::PFJet*>& selectedJets) {
 

@@ -226,6 +226,7 @@ class DPAnalysis : public edm::EDAnalyzer {
       //std::vector<int> firedTrigID ;
       ///string TriggerName ;
 
+      bool debugT ; 
 };
 
 #endif

@@ -23,6 +23,17 @@ void setBranchAddresses(TTree* chain, Ntuple& treeVars)
   chain -> SetBranchAddress("metPy",       &treeVars.metPy     );
   chain -> SetBranchAddress("met",         &treeVars.met       );
 
+  // trigger matched objects 
+  chain -> SetBranchAddress("t_phoPx",      &treeVars.t_phoPx    );
+  chain -> SetBranchAddress("t_phoPy",      &treeVars.t_phoPy    );
+  chain -> SetBranchAddress("t_phoPz",      &treeVars.t_phoPz    );
+  chain -> SetBranchAddress("t_phoE",       &treeVars.t_phoE     );
+  chain -> SetBranchAddress("t_phodR",      &treeVars.t_phodR    );
+  chain -> SetBranchAddress("t_metPx",      &treeVars.t_metPx    );
+  chain -> SetBranchAddress("t_metPy",      &treeVars.t_metPy    );
+  chain -> SetBranchAddress("t_met",        &treeVars.t_met      );
+  chain -> SetBranchAddress("t_metdR",      &treeVars.t_metdR    );
+
   // vertex variables
   chain -> SetBranchAddress("vtxNTracks", treeVars.vtxNTracks);
   chain -> SetBranchAddress("vtxChi2",    treeVars.vtxChi2   );
@@ -122,6 +133,16 @@ void setBranches(TTree* chain, Ntuple& treeVars)
   chain -> Branch("metPy",       &treeVars.metPy,                "metPy/F");
   chain -> Branch("met",         &treeVars.met,                  "met/F");
 
+  chain -> Branch("t_metPx",     &treeVars.t_metPx,              "t_metPx/F");
+  chain -> Branch("t_metPy",     &treeVars.t_metPy,              "t_metPy/F");
+  chain -> Branch("t_met",       &treeVars.t_met,                "t_met/F");
+  chain -> Branch("t_metdR",     &treeVars.t_metdR,              "t_metdR/F");
+  chain -> Branch("t_phoPx",     &treeVars.t_phoPx,              "t_phoPx/F");
+  chain -> Branch("t_phoPy",     &treeVars.t_phoPy,              "t_phoPy/F");
+  chain -> Branch("t_phoPz",     &treeVars.t_phoPz,              "t_phoPz/F");
+  chain -> Branch("t_phoE",      &treeVars.t_phoE,               "t_phoE/F");
+  chain -> Branch("t_phodR",     &treeVars.t_phodR,              "t_phodR/F");
+
   chain -> Branch("muPx",        treeVars.muPx,                 "muPx[nMuons]/F");
   chain -> Branch("muPy",        treeVars.muPy,                 "muPy[nMuons]/F");
   chain -> Branch("muPz",        treeVars.muPz,                 "muPz[nMuons]/F");
@@ -218,6 +239,16 @@ void initializeBranches(TTree* chain, Ntuple& treeVars)
   treeVars.metPx = 0 ;
   treeVars.metPy = 0 ;
   treeVars.met   = 0 ;
+
+  treeVars.t_metPx = 0 ;
+  treeVars.t_metPy = 0 ;
+  treeVars.t_met   = 0 ;
+  treeVars.t_metdR = 99. ;
+  treeVars.t_phoPx = 0 ;
+  treeVars.t_phoPy = 0 ;
+  treeVars.t_phoPz = 0 ;
+  treeVars.t_phoE  = 0 ;
+  treeVars.t_phodR = 99 ;
 
   for ( int i=0; i< MAXJET; i++) {
       treeVars.jetPx[i] = 0 ;

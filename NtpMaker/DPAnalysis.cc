@@ -62,6 +62,9 @@ DPAnalysis::DPAnalysis(const edm::ParameterSet& iConfig){
    isData               = iConfig.getParameter<bool> ("isData");
    L1Select             = iConfig.getParameter<bool> ("L1Select");
 
+   const edm::InputTag TrigEvtTag("hltTriggerSummaryAOD","","HLT");
+   trigEvent            = iConfig.getUntrackedParameter<edm::InputTag>("triggerEventTag", TrigEvtTag);
+
    gen = new GenStudy( iConfig );
 
    theFile  = new TFile( rootFileName.c_str(), "RECREATE") ;
@@ -69,6 +72,7 @@ DPAnalysis::DPAnalysis(const edm::ParameterSet& iConfig){
    theTree  = new TTree ( "DPAnalysis","DPAnalysis" ) ;
    setBranches( theTree, leaves ) ;
 
+   targetTrig = 0 ;
    firedTrig.clear() ;
    for ( size_t i=0; i< triggerPatent.size(); i++ ) firedTrig.push_back(-1) ;  
 
@@ -106,17 +110,17 @@ DPAnalysis::~DPAnalysis()
 void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup) {
 
    // get calibration service
-  // IC's
-  iSetup.get<EcalIntercalibConstantsRcd>().get(ical);
-  // ADCtoGeV
-  iSetup.get<EcalADCToGeVConstantRcd>().get(agc);
-  // transp corrections
-  iSetup.get<EcalLaserDbRecord>().get(laser);
-  // Geometry
-  iSetup.get<CaloGeometryRecord> ().get (pGeometry) ;
-  theGeometry = pGeometry.product() ;
-  // event time
-  eventTime = iEvent.time() ;
+   // IC's
+   iSetup.get<EcalIntercalibConstantsRcd>().get(ical);
+   // ADCtoGeV
+   iSetup.get<EcalADCToGeVConstantRcd>().get(agc);
+   // transp corrections
+   iSetup.get<EcalLaserDbRecord>().get(laser);
+   // Geometry
+   iSetup.get<CaloGeometryRecord> ().get (pGeometry) ;
+   theGeometry = pGeometry.product() ;
+   // event time
+   eventTime = iEvent.time() ;
 
    initializeBranches( theTree, leaves );
 
@@ -198,6 +202,17 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent ) {
 
    bool passEvent = true ;
 
+   // find trigger matched objects
+   //cout<<" ~~~~~~~~~~~~~~~~~ "<<endl ;
+   const reco::Photon rPho ;
+   GetTrgMatchObject(  rPho , iEvent,  photonSource ) ;
+   //cout<<" ----------------- "<<endl ;
+   const reco::PFMET pfMet_ = (*met)[0] ;
+   GetTrgMatchObject( pfMet_, iEvent,  metSource ) ;
+   //cout<<" ================= "<<endl ;
+   //cout<<" "<<endl ;
+  
+
    bool hasGoodVtx = VertexSelection( recVtxs );
    if ( !hasGoodVtx ) passEvent = false ;
    if ( passEvent )   counter[2]++ ;  
@@ -233,7 +248,9 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent ) {
 
    selectedMuons.clear() ;
    MuonSelection( muons, selectedMuons );
-   
+
+   //HLTMET( jets, selectedMuons );   
+
    const reco::PFMET pfMet = (*met)[0] ;
    leaves.met   = pfMet.et() ;
    leaves.metPx = pfMet.px() ;
@@ -277,8 +294,8 @@ void DPAnalysis::TriggerTagging( Handle<edm::TriggerResults> triggers, const edm
           for ( size_t j=0; j< triggerPatent.size(); j++ )  {
               if ( strncmp( tName.c_str(), triggerPatent[j].c_str(), triggerPatent[j].size() ) ==0 ) {
                   firedTrig[j] = i;
-                 cout<<" Trigger Found ("<<j <<"):  "<<tName ;
-                 cout<<" Idx: "<< i <<" triggers "<<endl;
+                  cout<<" Trigger Found ("<<j <<"):  "<<tName ;
+                  cout<<" Idx: "<< i <<" triggers "<<endl;
               }
           }
       }
@@ -299,11 +316,100 @@ bool DPAnalysis::TriggerSelection( Handle<edm::TriggerResults> triggers, vector<
    }
 
    if ( trgbits != 0 ) {
-      leaves.triggered = (int)(trgbits) ;
       pass = true ;
    }
+   leaves.triggered = (int)(trgbits) ;
+   targetTrig = (int)(trgbits) ;
 
    return pass ;
+}
+
+
+template<class object >
+bool DPAnalysis::GetTrgMatchObject( object, const edm::Event& iEvent,  InputTag inputProducer_ ) {
+
+    bool findMatch = false ;
+    // Get the input collection
+    Handle<edm::View<object> > candHandle;
+    iEvent.getByLabel( inputProducer_ , candHandle);
+
+    Handle<trigger::TriggerEvent> trgEvent;
+    iEvent.getByLabel( trigEvent, trgEvent);
+
+    // get trigger object
+    const trigger::TriggerObjectCollection& TOC( trgEvent->getObjects() );
+
+    // find how many objects there are
+    unsigned int nobj=0;
+    double mindR = 999. ;
+    double minP4[5] = { 0, 0, 0, 0, 0 } ;
+    bool testPho = false ;
+    bool testMET = false ;
+    for( typename edm::View< object>::const_iterator j = candHandle->begin(); j != candHandle->end(); ++j, ++nobj) {
+
+       // find out what filter is  
+       //cout<<" trg : "<< inputProducer_.label() <<" filter sz: "<< trgEvent->sizeFilters() <<" nObj:"<< nobj << endl;
+       for ( size_t ia = 0; ia < trgEvent->sizeFilters(); ++ia ) {
+
+           // get the hlt filter
+	   string fullname = trgEvent->filterTag(ia).encode();
+	   size_t p = fullname.find_first_of(':');
+	   string filterName = ( p != std::string::npos) ? fullname.substr(0, p) : fullname ; 
+
+	   bool trigPhoton = false ;
+	   bool trigPfMet  = false ;
+	   if ( strncmp( filterName.c_str(), "hltPhoton65CaloIdVLIsoLTrackIsoFilter", filterName.size() ) ==0 ) trigPhoton = true ;
+	   if ( strncmp( filterName.c_str(), "hltPFMET25", filterName.size() ) ==0 ) trigPfMet = true ;
+
+	   testPho = ( strncmp( inputProducer_.label().c_str(), "myphotons", 9 ) == 0 ) ;
+	   testMET = ( strncmp( inputProducer_.label().c_str(), "pfMet", 5 ) == 0 ) ;
+	   if ( !trigPhoton && !trigPfMet )  continue ;
+	   if (  trigPhoton && !testPho ) continue ;
+	   if (  trigPfMet  && !testMET ) continue ;
+
+	   //if ( trigPhoton ) cout<<" Photon filter name: "<< filterName ;
+	   //if ( trigPfMet  ) cout<<" PfMet  filter name: "<< filterName ;
+
+	   // Get cut decision for each candidate
+           const trigger::Keys& KEYS( trgEvent->filterKeys( ia ) );
+	   int nKey = (int) KEYS.size() ;
+	   //cout<<" nKey : "<< nKey << endl ;
+           
+	   for (int ipart = 0; ipart != nKey; ++ipart) { 
+               const trigger::TriggerObject& TO = TOC[KEYS[ipart]];       
+	       double dRval = deltaR( j->eta(), j->phi(), TO.eta(), TO.phi() );
+	       //cout<<" Reco pt:"<< j->pt() <<"   TO pt: "<< TO.pt() <<endl ;
+	       //cout<<"   -- > dR = " << dRval <<endl ;
+               if ( dRval < mindR  ) { 
+                  mindR = dRval ;
+                  minP4[0] = TO.px() ;
+                  minP4[1] = TO.py() ;
+                  minP4[2] = TO.pz() ;
+                  minP4[3] = TO.energy() ;
+                  minP4[4] = TO.pt() ;
+               }
+           }
+       }
+    }
+   
+    if ( mindR < 0.5 ) findMatch = true ;
+    if ( mindR < 9. && testMET ) {
+       leaves.t_metPx = minP4[0] ;
+       leaves.t_metPy = minP4[1] ;
+       leaves.t_met   = minP4[4] ;
+       leaves.t_metdR = mindR ;
+       //if ( mindR < 0.5 ) cout<<" ** GOT MET => "<< minP4[4] << endl ;
+    }   
+    if ( mindR < 9. && testPho ) {
+       leaves.t_phoPx = minP4[0] ;
+       leaves.t_phoPy = minP4[1] ;
+       leaves.t_phoPz = minP4[2] ;
+       leaves.t_phoE  = minP4[3] ;
+       leaves.t_phodR = mindR    ;
+       //if ( mindR < 0.5 ) cout<<" ** GOT Photon => "<< minP4[4] << endl ;
+    }   
+
+    return findMatch ;
 }
 
 void DPAnalysis::PrintTriggers( const edm::Event& iEvent ) {
@@ -318,7 +424,7 @@ void DPAnalysis::PrintTriggers( const edm::Event& iEvent ) {
        string tName  = trgNames.triggerName( i );
        int trgIndex  = trgNames.triggerIndex(tName);
        int trgResult = triggers->accept(trgIndex);
-       cout<<" name: "<< tName <<"  idx:"<< trgIndex <<"  accept:"<< trgResult <<endl;
+       cout<<" name: "<< tName <<" ("<< i <<")  idx:"<< trgIndex <<"  accept:"<< trgResult <<endl;
        for ( size_t j=0; j< triggerPatent.size(); j++) {
            if ( strncmp( tName.c_str(), triggerPatent[j].c_str(), triggerPatent[j].size() ) ==0 ) {
               //TriggerName = tName ;
@@ -442,7 +548,7 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
        phoTmp.maxSX  = -1 ;
        //cout<<" 1st xT : "<< aveXtalTime <<"  xTE : "<< aveXtalTimeErr << endl;
        // Only use the seed cluster
-       //if ( seedTime > 8. ) debugT = true ;
+       //if ( seedTime > 5. ) debugT = true ;
        if ( debugT ) printf("===== seedT: %.2f, 1st Ave.T: %.2f =====\n", seedTime,  AveXtalTE.first ) ;
        ClusterTime( it->superCluster(), recHitsEB , recHitsEE, phoTmp );
        //cout<<" 2nd xT : "<< aveXtalTime <<"  xTE : "<< aveXtalTimeErr << endl;
@@ -668,16 +774,17 @@ void DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitColl
 
              // calculate chi2 for the BC of the seed
              double chi2_x = pow( ((thistime - phoTmp.t) / xtimeErr_ ) , 2 ) ; 
-             if ( debugT ) printf(" xtal(%d)  t: %.2f, dt: %f,  chi2: %.2f  \n", 
-                                   (int)ndof, thistime, xtimeErr_,  chi2_x );
+             string EBorEE = ( isEB ) ? "EB" : "EE" ;
+             if ( debugT ) printf(" %s xtal(%d)  t: %.2f, dt: %f,  chi2: %.2f , amp: %.2f  \n", 
+                                 EBorEE.c_str(),  (int)ndof, thistime, xtimeErr_,  chi2_x, thisamp );
              chi2_bc += chi2_x ;
              ndof += 1 ;
+             nXtl++ ;
              // remove un-qualified hits 
              if ( fabs ( thistime - phoTmp.t ) > 3.*phoTmp.dt ) continue ;
  
              xtime     += thistime / pow( xtimeErr_ , 2 ) ;
              xtimeErr  += 1/ pow( xtimeErr_ , 2 ) ;
-             nXtl++ ;
       }
   }
   if ( debugT ) printf("--- sum_chi2: %.2f, ndof: %.1f norm_chi2: %.2f ---\n", chi2_bc, ndof, chi2_bc/ndof );
@@ -718,14 +825,44 @@ void DPAnalysis::EventTime( const edm::Event& iEvent ) {
 	      detitr != clusterDetIds.end () ; ++detitr) {// loop on rechics of barrel basic clusters
 
        }
-
-
    }
-
-
 
 }
 */
+/*
+double DPAnalysis::HLTMET( Handle<reco::PFJetCollection> jets, vector<const reco::Muon*>& selectedMuons , bool addMuon ) {
+
+   double hltHT  = 0. ;
+   double hltMEx = 0. ;
+   double hltMEy = 0. ;
+   int nj_mht = 0 ;
+   for(reco::PFJetCollection::const_iterator it = jets->begin(); it != jets->end(); it++) {
+       // fiducial cuts
+       if ( it->pt() < 40. || fabs( it->eta() ) > 999.  ) continue ;
+       hltHT += it->pt() ;
+       hltMEx -= it->p4().Px() ;
+       hltMEy -= it->p4().Py() ;
+       nj_mht++ ;
+   }
+ 
+   if ( addMuon ) {  
+      for( size_t i =0 ; i < selectedMuons.size() ; i++) {
+         if ( selectedMuons[i]->pt() < 40 || fabs( selectedMuons[i]->eta() ) > 999. ) continue ;
+         hltMEx -= selectedMuons[i]->p4().Px() ;
+         hltMEy -= selectedMuons[i]->p4().Py() ;
+         nj_mht++ ;
+      }
+   }
+
+   double hltMET = ( nj_mht < 1 ) ? 0 : sqrt( (hltMEx*hltMEx) + (hltMEy*hltMEy) ) ;
+   leaves.hltMet   = hltMET ;
+   leaves.hltMetPx = hltMEx ;
+   leaves.hltMetPy = hltMEy ;
+
+   return hltMET ;
+}
+*/
+
 bool DPAnalysis::JetSelection( Handle<reco::PFJetCollection> jets, vector<const reco::Photon*>& selectedPhotons, 
                                vector<const reco::PFJet*>& selectedJets) {
 

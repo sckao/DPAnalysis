@@ -51,6 +51,16 @@ struct Ntuple
   float metPy;
   float met;
 
+  float t_metPx;
+  float t_metPy;
+  float t_met;
+  float t_metdR;
+  float t_phoPx;
+  float t_phoPy;
+  float t_phoPz;
+  float t_phoE;
+  float t_phodR;
+
   int   nElectrons ;
   float elePx[MAXELE];
   float elePy[MAXELE];

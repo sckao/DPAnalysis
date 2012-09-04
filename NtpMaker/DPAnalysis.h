@@ -35,6 +35,9 @@
 
 #include "DataFormats/Common/interface/TriggerResults.h"
 #include "FWCore/Common/interface/TriggerNames.h"
+#include "DataFormats/HLTReco/interface/TriggerObject.h"
+#include "DataFormats/HLTReco/interface/TriggerEvent.h"
+#include "DataFormats/Math/interface/deltaR.h"
 
 #include "DataFormats/ParticleFlowCandidate/interface/PFCandidate.h"
 #include "DataFormats/ParticleFlowReco/interface/PFBlock.h"
@@ -143,6 +146,9 @@ class DPAnalysis : public edm::EDAnalyzer {
       bool TriggerSelection( edm::Handle<edm::TriggerResults> triggers, vector<int> firedTrig ) ;
       //bool TriggerSelection( const edm::Event& iEvent, int RunID ) ;
  
+      template<typename object>
+      bool GetTrgMatchObject( object, const edm::Event& iEvent, edm::InputTag inputProducer_ ) ;
+
       bool VertexSelection( edm::Handle<reco::VertexCollection> vtx ) ;
 
       bool PhotonSelection(  edm::Handle<reco::PhotonCollection> photons, edm::Handle<EcalRecHitCollection> recHitsEB, edm::Handle<EcalRecHitCollection> recHitsEE, edm::Handle<reco::TrackCollection> tracks, vector<const reco::Photon*>& selectedPhotons ) ;
@@ -150,6 +156,8 @@ class DPAnalysis : public edm::EDAnalyzer {
       pair<double,double> ClusterTime( reco::SuperClusterRef scRef, edm::Handle<EcalRecHitCollection> recHitsEB, edm::Handle<EcalRecHitCollection> recHitsEE ) ;
       void ClusterTime( reco::SuperClusterRef scRef, edm::Handle<EcalRecHitCollection> recHitsEB, edm::Handle<EcalRecHitCollection> recHitsEE, PhoInfo& phoTmp, bool useAllClusters = false ) ;
       //void ClusterTime( reco::SuperClusterRef scRef, edm::Handle<EcalRecHitCollection> recHitsEB, edm::Handle<EcalRecHitCollection> recHitsEE, double& aveTime, double& aveTimeErr, double& nChi2, bool useAllClusters = false ) ;
+
+      //double HLTMET( edm::Handle<reco::PFJetCollection> jets, vector<const reco::Muon*>& selectedMuons, bool addMuon = false ) ;
 
       bool JetSelection( edm::Handle<reco::PFJetCollection> jets, vector<const reco::Photon*>& selectedPhotons,
                                                                      vector<const reco::PFJet*>& selectedJets ) ;
@@ -182,6 +190,7 @@ class DPAnalysis : public edm::EDAnalyzer {
       string l1GTSource ;
 
       edm::InputTag trigSource;
+      edm::InputTag trigEvent;
       edm::InputTag pvSource;
       edm::InputTag beamSpotSource;
       edm::InputTag muonSource;
@@ -223,6 +232,7 @@ class DPAnalysis : public edm::EDAnalyzer {
       edm::Timestamp eventTime ;
 
       std::vector<int> firedTrig ;
+      int targetTrig ;
       //std::vector<int> firedTrigID ;
       ///string TriggerName ;
 

@@ -47,7 +47,8 @@ DPAnalysis::DPAnalysis(const edm::ParameterSet& iConfig){
 
    EBRecHitCollection   = iConfig.getParameter<edm::InputTag> ("EBRecHitCollection") ;
    EERecHitCollection   = iConfig.getParameter<edm::InputTag> ("EERecHitCollection") ;
- 
+   //CSCSegmentTag        = iConfig.getParameter<edm::InputTag> ("CSCSegmentCollection") ;
+   cscHaloTag           = iConfig.getParameter<edm::InputTag> ("cscHaloData");
    //pileupSource         = iConfig.getParameter<edm::InputTag>("addPileupInfo");
 
    vtxCuts              = iConfig.getParameter<std::vector<double> >("vtxCuts");
@@ -62,7 +63,7 @@ DPAnalysis::DPAnalysis(const edm::ParameterSet& iConfig){
    isData               = iConfig.getParameter<bool> ("isData");
    L1Select             = iConfig.getParameter<bool> ("L1Select");
 
-   const edm::InputTag TrigEvtTag("hltTriggerSummaryAOD","","HLT");
+   const InputTag TrigEvtTag("hltTriggerSummaryAOD","","HLT");
    trigEvent            = iConfig.getUntrackedParameter<edm::InputTag>("triggerEventTag", TrigEvtTag);
 
    gen = new GenStudy( iConfig );
@@ -133,7 +134,6 @@ void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
    /* 
    Handle<std::vector< PileupSummaryInfo > >  PupInfo;
    iEvent.getByLabel(pileupSource, PupInfo);
-
    for( std::vector<PileupSummaryInfo>::const_iterator PVI = PupInfo->begin(); PVI != PupInfo->end(); ++PVI) {
        std::cout << " Pileup Information: bunchXing, nvtx: " << PVI->getBunchCrossing() << " " << PVI->getPU_NumInteractions() << std::endl;
    }
@@ -145,7 +145,7 @@ void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
 
    counter[0]++ ;  
    // L1 Trigger Selection
-   bool passL1 = L1TriggerSelection( iEvent, iSetup ) ;
+   passL1 = L1TriggerSelection( iEvent, iSetup ) ;
 
    // HLT trigger analysis
    Handle<edm::TriggerResults> triggers;
@@ -153,7 +153,7 @@ void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
    const edm::TriggerNames& trgNameList = iEvent.triggerNames( *triggers ) ;
 
    TriggerTagging( triggers, trgNameList, run_id, firedTrig ) ;
-   bool passHLT = TriggerSelection( triggers, firedTrig ) ;
+   passHLT = TriggerSelection( triggers, firedTrig ) ;
 
    // Using L1 or HLT to select events ?!
    bool passTrigger = ( L1Select ) ? passL1 : passHLT  ;
@@ -170,6 +170,15 @@ void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
    bool pass = EventSelection( iEvent ) ;
    if ( pass && passTrigger ) counter[7]++ ;   
 
+   // for cscsegments and halo muon/photon studies
+   /*
+   Handle<CSCSegmentCollection>       cscSegments ;
+   iEvent.getByLabel( CSCSegmentTag,  cscSegments );
+   bool haloMuon = BeamHaloMatch( cscSegments, selectedPhotons, iSetup ) ;
+   */
+   //if ( haloMuon ) cout<<" haloMuon ! "<<endl ;
+  
+   // fill the ntuple
    if ( pass && !isData ) theTree->Fill();
    if ( pass && isData && passTrigger ) theTree->Fill();
 }
@@ -232,7 +241,8 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent ) {
    } else {
        counter[4]++ ;
    }
- 
+   CSCHaloCleaning( iEvent, selectedPhotons ) ;
+
    //IsoPhotonSelection( selectedPhotons ) ;
    //if ( selectedPhotons.size() < photonCuts[5] )  passEvent = false ;
 
@@ -264,11 +274,11 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent ) {
 bool DPAnalysis::L1TriggerSelection( const edm::Event& iEvent, const edm::EventSetup& iSetup ) {
 
     // Get L1 Trigger menu
-    edm::ESHandle<L1GtTriggerMenu> menuRcd;
+    ESHandle<L1GtTriggerMenu> menuRcd;
     iSetup.get<L1GtTriggerMenuRcd>().get(menuRcd) ;
     const L1GtTriggerMenu* menu = menuRcd.product();
     // Get L1 Trigger record  
-    edm::Handle< L1GlobalTriggerReadoutRecord > gtRecord;
+    Handle< L1GlobalTriggerReadoutRecord > gtRecord;
     iEvent.getByLabel( edm::InputTag("gtDigis"), gtRecord);
     // Get dWord after masking disabled bits
     const DecisionWord dWord = gtRecord->decisionWord();
@@ -280,6 +290,61 @@ bool DPAnalysis::L1TriggerSelection( const edm::Event& iEvent, const edm::EventS
    if ( l1_accepted ) leaves.L1a = 1 ;
 
    return l1_accepted ;
+}
+
+void DPAnalysis::CSCHaloCleaning( const edm::Event& iEvent, vector<const reco::Photon*>& selectedPhotons ) { 
+
+   Handle<reco::CSCHaloData> cschalo;
+   iEvent.getByLabel( cscHaloTag, cschalo ); 
+
+   if ( cschalo.isValid() ) {
+      const reco::CSCHaloData cscData = *(cschalo.product()) ;
+      int nOutTimeHits       = cscData.NumberOfOutTimeHits() ;
+      int nMinusHTrks        = cscData.NHaloTracks( reco::HaloData::minus ) ; 
+      int nPlusHTrks         = cscData.NHaloTracks( reco::HaloData::plus )  ; 
+      //int nTrksSmallBeta     = cscData.NTracksSmallBeta()    ; 
+      //int nHaloSegs          = cscData.NFlatHaloSegments() ;
+       
+      //cout<<" nOutT: "<< nOutTimeHits  <<" nTrkBeta:"<< nTrksSmallBeta <<" nHaloSeg: "<< nHaloSegs ;
+      //cout<<" N Minus tracks : "<< nMinusHTrks <<" N Plus tracks : "<< nPlusHTrks << endl ;
+      RefVector< reco::TrackCollection > trkRef  = cscData.GetTracks() ;
+      //cout<<" NTrkRefs = "<<  trkRef.size()  << endl ;
+      /*
+      // the first track is closed to the ImpactPosition
+      for( RefVector< reco::TrackCollection >::const_iterator it =  trkRef.begin();  it != trkRef.end() ; ++it ) {
+         const vector<reco::Track>* trks = it->product() ;
+         for ( size_t j=0; j< trks->size(); j++ ) {
+             if ( ! (*trks)[j].innerOk() ) continue ;
+    	     math::XYZPoint tXYZ = (*trks)[j].innerPosition() ;
+    	     cout<<"    --> ( "<< tXYZ.Phi() <<", " << tXYZ.Rho() <<", " << tXYZ.Z() <<") "<<endl ;
+         }
+      }
+      */
+
+      leaves.nOutTimeHits = nOutTimeHits ;
+      leaves.nHaloTrack   = nMinusHTrks + nPlusHTrks ;
+
+      std::vector<GlobalPoint> gp = cscData.GetCSCTrackImpactPositions() ;
+      //cout<<" impact gp sz : "<< gp.size() <<" photon sz:"<< selectedPhotons.size() << endl ;
+
+      for (vector<GlobalPoint>::const_iterator it = gp.begin(); it != gp.end() ; ++it ) {
+          double rho = sqrt(  (it->x()*it->x()) + (it->y()*it->y()) );
+          //cout<<"    ==>  phi:"<<  it->phi() <<" rho: "<< rho << " z: "<< it->z() <<endl ;
+          leaves.haloPhi = it->phi() ;
+          leaves.haloRho = rho ;
+ 
+          /*
+          for ( size_t i=0; i< selectedPhotons.size() ; i++ ) { 
+              double dPhi = fabs( selectedPhotons[i]->phi() - it->phi() ) ;
+              double rhoG = sqrt(  ( selectedPhotons[i]->p4().x()*selectedPhotons[i]->p4().x() ) 
+                                 + ( selectedPhotons[i]->p4().y()*selectedPhotons[i]->p4().y() )  );
+              double dRho = fabs( rho - rhoG ) ;
+              cout<<"    ("<< i << ") ==> dPhi : "<< dPhi <<" dRho : "<< dRho << endl ;
+          }
+          */
+      }
+   }
+
 }
 
 void DPAnalysis::TriggerTagging( Handle<edm::TriggerResults> triggers, const edm::TriggerNames& trgNameList, int RunId, vector<int>& firedTrig ) {
@@ -355,17 +420,19 @@ bool DPAnalysis::GetTrgMatchObject( object, const edm::Event& iEvent,  InputTag 
 	   string fullname = trgEvent->filterTag(ia).encode();
 	   size_t p = fullname.find_first_of(':');
 	   string filterName = ( p != std::string::npos) ? fullname.substr(0, p) : fullname ; 
+           //cout<<"    ... filterName : " << fullname <<" ==> "<< filterName << endl ;
 
 	   bool trigPhoton = false ;
 	   bool trigPfMet  = false ;
 	   if ( strncmp( filterName.c_str(), "hltPhoton65CaloIdVLIsoLTrackIsoFilter", filterName.size() ) ==0 ) trigPhoton = true ;
 	   if ( strncmp( filterName.c_str(), "hltPFMET25", filterName.size() ) ==0 ) trigPfMet = true ;
+	   if ( strncmp( filterName.c_str(), "hltPFMET25Filter", filterName.size() ) ==0 ) trigPfMet = true ;
 
 	   testPho = ( strncmp( inputProducer_.label().c_str(), "myphotons", 9 ) == 0 ) ;
 	   testMET = ( strncmp( inputProducer_.label().c_str(), "pfMet", 5 ) == 0 ) ;
-	   if ( !trigPhoton && !trigPfMet )  continue ;
-	   if (  trigPhoton && !testPho ) continue ;
-	   if (  trigPfMet  && !testMET ) continue ;
+	   if ( !trigPhoton && !trigPfMet ) continue ;
+	   if (  trigPhoton && !testPho   ) continue ;
+	   if (  trigPfMet  && !testMET   ) continue ;
 
 	   //if ( trigPhoton ) cout<<" Photon filter name: "<< filterName ;
 	   //if ( trigPfMet  ) cout<<" PfMet  filter name: "<< filterName ;
@@ -583,7 +650,9 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
        leaves.seedTimeErr[k]  = seedTimeErr ;
        leaves.aveTime[k]      = phoTmp.t ;       // weighted ave. time of seed cluster 
        leaves.aveTimeErr[k]   = phoTmp.dt ;
-
+       leaves.sigmaEta[k]     = it->sigmaEtaEta() ;
+       leaves.sigmaIeta[k]    = it->sigmaIetaIeta() ;
+   
        selectedPhotons.push_back( &(*it) ) ;
        k++ ;
    }
@@ -594,6 +663,46 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
    else                               return false ;    
 
 }
+
+/*
+bool DPAnalysis::BeamHaloMatch( Handle<CSCSegmentCollection> cscSeg, vector<const reco::Photon*>& selectedPhotons, const EventSetup& iSetup ) {
+
+   ESHandle<CSCGeometry> cscGeom;
+   iSetup.get<MuonGeometryRecord>().get(cscGeom);
+
+   bool halomatch = false ;
+   for ( size_t i=0; i< selectedPhotons.size() ; i++ ) {
+
+       if ( leaves.seedTime[i] > -3. ) continue ;
+       double dPhi = 99. ;
+       double cscT = 99. ;
+       for (CSCSegmentCollection::const_iterator it = cscSeg->begin(); it != cscSeg->end(); it++) {
+           if ( !it->isValid() ) continue ;
+           CSCDetId DetId = it->cscDetId();
+	   const CSCChamber* cscchamber = cscGeom->chamber( DetId );
+	   GlobalPoint  gp = cscchamber->toGlobal( it->localPosition()  );
+           double gpMag = sqrt( (gp.x()*gp.x()) + (gp.y()*gp.y()) + (gp.z()*gp.z()) ) ;
+	   LorentzVector segP4( gp.x(), gp.y(), gp.z(), gpMag ) ;
+
+           if ( fabs( gp.eta() ) < 1.6  ) continue ;
+           //double dEta_ = fabs( gp.eta() - selectedPhotons[i]->eta() )  ;
+           //dEta = ( dEta_ < dEta ) ? dEta_ : dEta ;
+           //double dPhi_ = fabs( gp.phi() - selectedPhotons[i]->phi() )  ;
+           double dPhi_ = ROOT::Math::VectorUtil::DeltaPhi( segP4, selectedPhotons[i]->p4() ) ;
+           if ( fabs(dPhi_) < dPhi ) {
+              dPhi = fabs( dPhi_ ) ;
+              cscT = it->time() ;
+           }
+       }
+       if ( dPhi < 0.5 ) {
+          halomatch          = true ;
+          leaves.cscTime[i]  = cscT ;
+          leaves.cscdPhi[i]  = dPhi ;
+       }
+   }
+   return halomatch ;
+}
+*/
 
 // return time, timeError
 pair<double,double> DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitCollection> recHitsEB, Handle<EcalRecHitCollection> recHitsEE ) {

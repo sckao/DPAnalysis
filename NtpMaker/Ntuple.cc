@@ -18,6 +18,10 @@ void setBranchAddresses(TTree* chain, Ntuple& treeVars)
   chain -> SetBranchAddress("nVertices",   &treeVars.nVertices  );
   chain -> SetBranchAddress("totalNVtx",   &treeVars.totalNVtx  );
   chain -> SetBranchAddress("nGen",        &treeVars.nGen       );
+  chain -> SetBranchAddress("nOutTimeHits",  &treeVars.nOutTimeHits );
+  chain -> SetBranchAddress("nHaloTrack",    &treeVars.nHaloTrack );
+  chain -> SetBranchAddress("haloPhi",       &treeVars.haloPhi    );
+  chain -> SetBranchAddress("haloRho",       &treeVars.haloRho    );
 
   chain -> SetBranchAddress("metPx",       &treeVars.metPx     );
   chain -> SetBranchAddress("metPy",       &treeVars.metPy     );
@@ -94,6 +98,10 @@ void setBranchAddresses(TTree* chain, Ntuple& treeVars)
   chain -> SetBranchAddress("maxSwissX",    treeVars.maxSwissX ) ;
   chain -> SetBranchAddress("seedSwissX",   treeVars.seedSwissX ) ;
   chain -> SetBranchAddress("nBC",          treeVars.nBC ) ;
+  chain -> SetBranchAddress("sigmaEta",     treeVars.sigmaEta ) ;
+  chain -> SetBranchAddress("sigmaIeta",    treeVars.sigmaIeta ) ;
+//  chain -> SetBranchAddress("cscTime",      treeVars.cscTime ) ;
+//  chain -> SetBranchAddress("cscdPhi",      treeVars.cscdPhi ) ;
 
   chain -> SetBranchAddress("genPx",        treeVars.genPx       );
   chain -> SetBranchAddress("genPy",        treeVars.genPy       );
@@ -128,6 +136,11 @@ void setBranches(TTree* chain, Ntuple& treeVars)
   chain -> Branch("nVertices",   &treeVars.nVertices,            "nVertices/I");
   chain -> Branch("totalNVtx",   &treeVars.totalNVtx,            "totalNVtx/I");
   chain -> Branch("nGen",        &treeVars.nGen,                 "nGen/I");
+
+  chain -> Branch("nOutTimeHits",  &treeVars.nOutTimeHits, "nOutTimeHits/I" );
+  chain -> Branch("nHaloTrack",    &treeVars.nHaloTrack,   "nHaloTrack/I" );
+  chain -> Branch("haloPhi",       &treeVars.haloPhi,      "haloPhi/F" );
+  chain -> Branch("haloRho",       &treeVars.haloRho,      "haloRho/F" );
 
   chain -> Branch("metPx",       &treeVars.metPx,                "metPx/F");
   chain -> Branch("metPy",       &treeVars.metPy,                "metPy/F");
@@ -192,6 +205,10 @@ void setBranches(TTree* chain, Ntuple& treeVars)
   chain -> Branch("seedSwissX",   treeVars.seedSwissX,            "seedSwissX[nPhotons]/F"  ) ;
   chain -> Branch("nXtals",       treeVars.nXtals,                "nXtals[nPhotons]/I"  ) ;
   chain -> Branch("nBC",          treeVars.nBC,                   "nBC[nPhotons]/I"  ) ;
+  chain -> Branch("sigmaEta",     treeVars.sigmaEta,              "sigmaEta[nPhotons]/I"  ) ;
+  chain -> Branch("sigmaIeta",    treeVars.sigmaIeta,             "sigmaIeta[nPhotons]/I"  ) ;
+//  chain -> Branch("cscTime",      treeVars.cscTime,               "cscTime[nPhotons]/I"  ) ;
+//  chain -> Branch("cscdPhi",      treeVars.cscdPhi,               "cscdPhi[nPhotons]/I"  ) ;
  
   chain -> Branch("vtxNTracks",       treeVars.vtxNTracks,   "vtxNTracks[nVertices]/I");
   chain -> Branch("vtxChi2",          treeVars.vtxChi2,      "vtxChi2[nVertices]/F");
@@ -235,6 +252,11 @@ void initializeBranches(TTree* chain, Ntuple& treeVars)
   treeVars.nVertices  = 0 ;
   treeVars.totalNVtx  = 0 ;
   treeVars.nGen       = 0 ; 
+
+  treeVars.nOutTimeHits = -1 ;
+  treeVars.nHaloTrack   = -1 ;
+  treeVars.haloPhi      = -1 ;
+  treeVars.haloRho      = -1 ;
 
   treeVars.metPx = 0 ;
   treeVars.metPy = 0 ;
@@ -303,6 +325,10 @@ void initializeBranches(TTree* chain, Ntuple& treeVars)
       treeVars.seedSwissX[i]  = 0 ;
       treeVars.nXtals[i]      = 0 ;
       treeVars.nBC[i]         = 0 ;
+      treeVars.sigmaEta[i]    = -1. ;
+      treeVars.sigmaIeta[i]   = -1. ;
+      //treeVars.cscTime[i]     = 99. ;
+      //treeVars.cscdPhi[i]     = 99. ;
   }
   for(int i=0; i<MAXVTX; i++) {
       treeVars.vtxNTracks[i]=0;

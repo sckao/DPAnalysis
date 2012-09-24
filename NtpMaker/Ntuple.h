@@ -21,6 +21,15 @@ struct Ntuple
   int triggered ;
   int L1a;  
 
+  int nOutTimeHits ;
+  int nHaloTrack ;
+  float haloPhi ;
+  float haloRho ;
+  
+  //int nTrksSmallBeta ;
+  //int nHaloSegs ;
+  
+
   // vertex variables
   int   nVertices;
   int   totalNVtx ;
@@ -100,9 +109,13 @@ struct Ntuple
   float fSpike[MAXPHO] ;
   float maxSwissX[MAXPHO] ;
   float seedSwissX[MAXPHO] ;
+  float sigmaEta[MAXPHO] ;
+  float sigmaIeta[MAXPHO] ;
   int   nXtals[MAXPHO] ;
   int   nBC[MAXPHO] ;
 
+  //float cscTime[MAXPHO];
+  //float cscdPhi[MAXPHO];
 
   // Gen Particle information
   int nGen ; 

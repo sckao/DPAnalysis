@@ -1,0 +1,69 @@
+#This is the data card for the input of M2M3 analysis and TopMassFitter 
+# Auther : SCKao - UMN
+#
+
+# root files directory
+RootFiles = rootfiles/
+
+# histogram file name
+HFileName = gmsb180_met60
+#HFileName = HF_Input1
+#HFileName = HF_Input_MET100
+
+# Folder to store results
+Path = GMSB180_MET60/
+#Path = test7_Seed/
+LogFile = limitReport.log
+
+# plot type : png / gif / eps / jpg / pdf 
+PlotType = png
+
+#######################################
+# module  (0) Roostat test  (1) DP CLs  (2) SmearPlot  (3) Example CLs  (4) uplimit plot
+#         (5) Efficiency    (6) Single CLs Test 
+#######################################
+Module = 6
+TimeScope = ( -4.5 , 15.4 ) 
+Observables  = ( h_sgTime, rh_bgTime , rh_dataTime ) 
+
+#######################################
+# P_Value_B for u2: 0.0228, u1: 0.1587 , d1: 0.8413 , d2: 0.9772, data: 0
+#               scan: -1
+#######################################
+P_Value_B = -1
+SearchLimit = 0.95 
+
+#######################################
+# Toy MC setup 
+#######################################
+RandomSeed = 0
+NToys = 5000 
+
+#######################################
+# xsec in pb, Lumi in /pb
+# N of Generate MC ( Lambda 140)  ct100 ~ ct4000 : 50112 
+# N of Generate MC  ct20: 50112 , ct100: 37152 , ct250: 50112, ct500: 50112 
+# (Lambda 180)      ct1000: 46080, ct2000 ~ ct4000: 46944
+#######################################
+#TestModel = (   250,  500, 1000, 2000, 3000  )
+#SignalXsec = (  0.01,  0.01,  0.01,  0.01,  0.01 ) 
+#N_GenSignal = ( 50112, 50112, 46080, 50112, 50112 ) 
+TestModel = ( 3000  )
+SignalXsec = ( 0.01 ) 
+N_GenSignal = ( 50112 ) 
+Lumi = 11180
+
+
+#######################################
+# Below are Obsoleted parameters 
+#######################################
+
+# Files , '+' is the flag for TChain,  
+TheData = ( data+ )
+dataChain = ( Rootuple )
+TheMC = ( mc+ )
+mcChain = ( MCRootuple )
+
+# -1 : all of events
+#ProcessEvents = -1
+

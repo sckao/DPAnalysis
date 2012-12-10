@@ -4,13 +4,15 @@ process = cms.Process("Demo")
 
 process.load("FWCore.MessageService.MessageLogger_cfi")
 
-process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32( -1 ) )
+process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32( 2500 ) )
 
 process.source = cms.Source("PoolSource",
     # replace 'myfile.root' with the source file you want to use
     fileNames = cms.untracked.vstring(
-        #'dcache:/pnfs/cms/WAX/11/store/data/Run2012A/Photon/AOD/PromptReco-v1/000/191/247/002CDB97-4588-E111-8BF4-003048D37694.root',
-       'dcache:/pnfs/cms/WAX/11/store/data/Run2012B/SinglePhoton/RECO/PromptReco-v1/000/193/998/10950429-439D-E111-B454-BCAEC5329705.root'
+
+      #'dcache:/pnfs/cms/WAX/11/store/data/Run2012B/SinglePhoton/RECO/PromptReco-v1/000/196/681/700E4F1C-A9BB-E111-8B16-001D09F23174.root',
+       'dcache:/pnfs/cms/WAX/11/store/data/Run2012C/SinglePhoton/AOD/PromptReco-v2/000/200/190/1CD40010-5FDF-E111-AAA6-001D09F23F2A.root'
+
        #'dcache:/pnfs/cms/WAX/11/store/data/Run2012C/SinglePhoton/RECO/PromptReco-v2/000/202/328/10E27F81-DDFA-E111-B6A6-003048D2BC38.root'
        #'dcache:/pnfs/cms/WAX/11/store/data/Run2012B/MET/RECO/PromptReco-v1/000/195/552/04EA349F-5DB1-E111-A002-E0CB4E553651.root' 
        #'dcache:/pnfs/cms/WAX/11/store/data/Run2012B/SingleMu/RECO/PromptReco-v1/000/194/151/020D9700-FE9F-E111-9535-002481E0E56C.root'
@@ -35,8 +37,8 @@ process.options   = cms.untracked.PSet(
 
 
 process.ana = cms.EDAnalyzer('DPAnalysis',
-    #rootFileName     = cms.untracked.string('Photon_2012B_test.root'),
-    rootFileName     = cms.untracked.string('/uscms_data/d2/sckao/Photon_2012B_TrgMatch.root'),
+    rootFileName     = cms.untracked.string('Photon_2012_test.root'),
+    #rootFileName     = cms.untracked.string('/uscms_data/d2/sckao/Photon_2012B_TrgMatch.root'),
     #triggerName      = cms.vstring('HLT_IsoMu30_v', 'HLT_DisplacedPhoton65_CaloIdVL_IsoL_PFMET25'),
     triggerName      = cms.vstring('HLT_Photon50_CaloIdVL_IsoL', 'HLT_DisplacedPhoton65_CaloIdVL_IsoL_PFMET25'),
     L1GTSource       = cms.string('L1_SingleEG22'),
@@ -79,8 +81,8 @@ process.ana = cms.EDAnalyzer('DPAnalysis',
 # Global Tag
 process.load("Configuration.StandardSequences.FrontierConditions_GlobalTag_cff")
 #process.load("Configuration.StandardSequences.FrontierConditions_GlobalTag_noesprefer_cff")
-process.GlobalTag.globaltag = 'GR_P_V35::All'
-#process.GlobalTag.globaltag = 'START52_V9::All'
+#process.GlobalTag.globaltag = 'GR_P_V35::All'
+process.GlobalTag.globaltag = 'GR_P_V40::All'
 
 # to get clustering 
 #process.load("Configuration.StandardSequences.Geometry_cff")
@@ -111,6 +113,11 @@ import RecoEgamma.EgammaPhotonProducers.photons_cfi
 process.myphotonCores=RecoEgamma.EgammaPhotonProducers.photonCore_cfi.photonCore.clone()
 process.myphotonCores.scHybridBarrelProducer=cms.InputTag ("uncleanSCRecovered:uncleanHybridSuperClusters")
 
+from RecoEgamma.PhotonIdentification.mipVariable_cfi import *
+newMipVariable = mipVariable.clone()  
+newMipVariable.barrelEcalRecHitCollection = cms.InputTag('reducedEcalRecHitsEB')
+newMipVariable.endcapEcalRecHitCollection = cms.InputTag('reducedEcalRecHitsEE')
+
 from RecoEgamma.PhotonIdentification.isolationCalculator_cfi import*
 newisolationSumsCalculator = isolationSumsCalculator.clone()
 newisolationSumsCalculator.barrelEcalRecHitCollection = cms.InputTag('reducedEcalRecHitsEB')
@@ -120,6 +127,7 @@ process.myphotons=RecoEgamma.EgammaPhotonProducers.photons_cfi.photons.clone()
 process.myphotons.barrelEcalHits=cms.InputTag("reducedEcalRecHitsEB")
 process.myphotons.endcapEcalHits=cms.InputTag("reducedEcalRecHitsEE")
 process.myphotons.isolationSumsCalculatorSet=newisolationSumsCalculator
+process.myphotons.mipVariableSet = newMipVariable
 process.myphotons.photonCoreProducer=cms.InputTag("myphotonCores")
 
 process.myPhotonSequence = cms.Sequence(process.myphotonCores+

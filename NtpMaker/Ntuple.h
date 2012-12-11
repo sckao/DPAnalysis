@@ -114,8 +114,8 @@ struct Ntuple
   int   nXtals[MAXPHO] ;
   int   nBC[MAXPHO] ;
 
-  //float cscTime[MAXPHO];
-  //float cscdPhi[MAXPHO];
+  float cscRho[MAXPHO];
+  float cscdPhi[MAXPHO];
 
   // Gen Particle information
   int nGen ; 

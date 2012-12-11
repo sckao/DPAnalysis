@@ -86,15 +86,17 @@
 #include <algorithm>
 
 // for CSC Segment
-/*
 #include "Geometry/CSCGeometry/interface/CSCGeometry.h"
 #include "Geometry/CSCGeometry/interface/CSCChamber.h"
 #include "DataFormats/CSCRecHit/interface/CSCSegment.h"
 #include "DataFormats/CSCRecHit/interface/CSCSegmentCollection.h"
 #include "Geometry/Records/interface/MuonGeometryRecord.h"
-*/
+
 #include "DataFormats/METReco/interface/CSCHaloData.h"
 
+// TrackingRecHit to replace CSCSegment
+#include "DataFormats/TrackingRecHit/interface/TrackingRecHitFwd.h"
+#include "DataFormats/Common/interface/OwnVector.h"
 
 // Calibration services
 #include "Geometry/CaloGeometry/interface/CaloGeometry.h"
@@ -149,7 +151,7 @@ class DPAnalysis : public edm::EDAnalyzer {
 
       virtual void analyze(const edm::Event&, const edm::EventSetup&);
 
-      bool EventSelection( const edm::Event& iEvent );
+      bool EventSelection( const edm::Event& iEvent, const edm::EventSetup& iSetup );
 
       void CSCHaloCleaning( const edm::Event& iEvent, vector<const reco::Photon*>& selectedPhotons )  ;
 
@@ -186,7 +188,8 @@ class DPAnalysis : public edm::EDAnalyzer {
 
       bool GammaJetVeto( vector<const reco::Photon*>& selectedPhotons, vector<const reco::PFJet*>& selectedJets) ;
 
-      //bool BeamHaloMatch( edm::Handle<CSCSegmentCollection> cscSeg, vector<const reco::Photon*>& selectedPhotons, const edm::EventSetup& iSetup ) ;
+      bool BeamHaloMatch( edm::Handle<CSCSegmentCollection> cscSeg, vector<const reco::Photon*>& selectedPhotons, const edm::EventSetup& iSetup ) ;
+      bool BeamHaloMatch( edm::OwnVector<TrackingRecHit> rhits, vector<const reco::Photon*>& selectedPhotons, const edm::EventSetup& iSetup ) ;
 
    private:
 
@@ -219,6 +222,7 @@ class DPAnalysis : public edm::EDAnalyzer {
       edm::InputTag EERecHitCollection;
       //edm::InputTag CSCSegmentTag ;
       edm::InputTag cscHaloTag ;
+      edm::InputTag staMuons ;
       //edm::InputTag pileupSource ;
 
       edm::ESHandle<EcalIntercalibConstants> ical;

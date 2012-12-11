@@ -100,8 +100,8 @@ void setBranchAddresses(TTree* chain, Ntuple& treeVars)
   chain -> SetBranchAddress("nBC",          treeVars.nBC ) ;
   chain -> SetBranchAddress("sigmaEta",     treeVars.sigmaEta ) ;
   chain -> SetBranchAddress("sigmaIeta",    treeVars.sigmaIeta ) ;
-//  chain -> SetBranchAddress("cscTime",      treeVars.cscTime ) ;
-//  chain -> SetBranchAddress("cscdPhi",      treeVars.cscdPhi ) ;
+  chain -> SetBranchAddress("cscRho",       treeVars.cscRho ) ;
+  chain -> SetBranchAddress("cscdPhi",      treeVars.cscdPhi ) ;
 
   chain -> SetBranchAddress("genPx",        treeVars.genPx       );
   chain -> SetBranchAddress("genPy",        treeVars.genPy       );
@@ -207,8 +207,8 @@ void setBranches(TTree* chain, Ntuple& treeVars)
   chain -> Branch("nBC",          treeVars.nBC,                   "nBC[nPhotons]/I"  ) ;
   chain -> Branch("sigmaEta",     treeVars.sigmaEta,              "sigmaEta[nPhotons]/I"  ) ;
   chain -> Branch("sigmaIeta",    treeVars.sigmaIeta,             "sigmaIeta[nPhotons]/I"  ) ;
-//  chain -> Branch("cscTime",      treeVars.cscTime,               "cscTime[nPhotons]/I"  ) ;
-//  chain -> Branch("cscdPhi",      treeVars.cscdPhi,               "cscdPhi[nPhotons]/I"  ) ;
+  chain -> Branch("cscRho",       treeVars.cscRho,                "cscRho[nPhotons]/F"  ) ;
+  chain -> Branch("cscdPhi",      treeVars.cscdPhi,               "cscdPhi[nPhotons]/F"  ) ;
  
   chain -> Branch("vtxNTracks",       treeVars.vtxNTracks,   "vtxNTracks[nVertices]/I");
   chain -> Branch("vtxChi2",          treeVars.vtxChi2,      "vtxChi2[nVertices]/F");
@@ -294,7 +294,8 @@ void initializeBranches(TTree* chain, Ntuple& treeVars)
       treeVars.eleHcalIso[i] = -1 ;
       treeVars.eleTrkIso[i]  = -1 ;
       treeVars.eleNLostHits[i]  = -1 ;
-
+  }
+  for ( int i=0; i< MAXMU; i++) {
       treeVars.muPx[i] = 0 ;
       treeVars.muPy[i] = 0 ;
       treeVars.muPz[i] = 0 ;
@@ -327,8 +328,8 @@ void initializeBranches(TTree* chain, Ntuple& treeVars)
       treeVars.nBC[i]         = 0 ;
       treeVars.sigmaEta[i]    = -1. ;
       treeVars.sigmaIeta[i]   = -1. ;
-      //treeVars.cscTime[i]     = 99. ;
-      //treeVars.cscdPhi[i]     = 99. ;
+      treeVars.cscRho[i]      = -1. ;
+      treeVars.cscdPhi[i]     = 99. ;
   }
   for(int i=0; i<MAXVTX; i++) {
       treeVars.vtxNTracks[i]=0;

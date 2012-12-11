@@ -49,6 +49,8 @@ DPAnalysis::DPAnalysis(const edm::ParameterSet& iConfig){
    EERecHitCollection   = iConfig.getParameter<edm::InputTag> ("EERecHitCollection") ;
    //CSCSegmentTag        = iConfig.getParameter<edm::InputTag> ("CSCSegmentCollection") ;
    cscHaloTag           = iConfig.getParameter<edm::InputTag> ("cscHaloData");
+   staMuons             = iConfig.getParameter<edm::InputTag> ("staMuons");
+
    //pileupSource         = iConfig.getParameter<edm::InputTag>("addPileupInfo");
 
    vtxCuts              = iConfig.getParameter<std::vector<double> >("vtxCuts");
@@ -167,23 +169,20 @@ void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
    }
    //if ( !isData ) gen->PrintGenEvent( iEvent );
 
-   bool pass = EventSelection( iEvent ) ;
+   bool pass = EventSelection( iEvent, iSetup ) ;
    if ( pass && passTrigger ) counter[7]++ ;   
 
-   // for cscsegments and halo muon/photon studies
-   /*
-   Handle<CSCSegmentCollection>       cscSegments ;
-   iEvent.getByLabel( CSCSegmentTag,  cscSegments );
-   bool haloMuon = BeamHaloMatch( cscSegments, selectedPhotons, iSetup ) ;
-   */
-   //if ( haloMuon ) cout<<" haloMuon ! "<<endl ;
+      // for cscsegments and halo muon/photon studies
+      //Handle<CSCSegmentCollection>       cscSegments ;
+      //iEvent.getByLabel( CSCSegmentTag,  cscSegments );
+      //bool haloMuon = BeamHaloMatch( cscSegments, selectedPhotons, iSetup ) ;
   
    // fill the ntuple
    if ( pass && !isData ) theTree->Fill();
    if ( pass && isData && passTrigger ) theTree->Fill();
 }
 
-bool DPAnalysis::EventSelection(const edm::Event& iEvent ) {
+bool DPAnalysis::EventSelection(const edm::Event& iEvent, const edm::EventSetup& iSetup ) {
 
    Handle<reco::BeamHaloSummary>       beamHaloSummary ;
    Handle<edm::TriggerResults>         triggers;
@@ -242,6 +241,11 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent ) {
        counter[4]++ ;
    }
    CSCHaloCleaning( iEvent, selectedPhotons ) ;
+
+   Handle< edm::OwnVector<TrackingRecHit> >  mu_rhits ;
+   iEvent.getByLabel( staMuons,  mu_rhits );
+   bool haloMuon = BeamHaloMatch( *(mu_rhits.product()), selectedPhotons, iSetup ) ;
+   //if ( haloMuon ) cout<<" haloMuon ! "<<endl ;
 
    //IsoPhotonSelection( selectedPhotons ) ;
    //if ( selectedPhotons.size() < photonCuts[5] )  passEvent = false ;
@@ -664,7 +668,51 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
 
 }
 
-/*
+// AOD version - using TrackingRecHits 
+bool DPAnalysis::BeamHaloMatch( OwnVector<TrackingRecHit> rhits, vector<const reco::Photon*>& selectedPhotons, const EventSetup& iSetup ) {
+
+    ESHandle<CSCGeometry> cscGeom;
+    iSetup.get<MuonGeometryRecord>().get(cscGeom);
+
+    bool halomatch = false ;
+    for ( size_t i=0; i< selectedPhotons.size() ; i++ ) {
+
+        float dPhi = 99. ;
+        float cscRho = -1. ;
+        for (OwnVector<TrackingRecHit>::const_iterator rh = rhits.begin(); rh != rhits.end() ; rh++ ) { 
+            //if( ! rh->isValid() ) continue ;
+	    if ( rh->geographicalId().subdetId() != MuonSubdetId::CSC ) continue ;
+	    if ( rh->geographicalId().det() != 2 ) continue ;
+	    //CSCDetId cscId( rh->rawId() );
+	    CSCDetId cscId( rh->geographicalId().rawId() );
+	    const CSCChamber* cscchamber = cscGeom->chamber( cscId );
+	    GlobalPoint  gp = cscchamber->toGlobal( rh->localPosition()  );
+	    double gpMag = sqrt( (gp.x()*gp.x()) + (gp.y()*gp.y()) + (gp.z()*gp.z()) ) ;
+	    LorentzVector segP4( gp.x(), gp.y(), gp.z(), gpMag ) ;
+
+            if ( fabs( gp.eta() ) < 1.6  ) continue ;
+            float dPhi_ = ROOT::Math::VectorUtil::DeltaPhi( segP4, selectedPhotons[i]->p4() ) ;
+	    float rho = sqrt( (gp.x()*gp.x()) + (gp.y()*gp.y()) ) ;
+            //printf(" (%d) phi_g: %.3f, phi_m: %.3f , dphi: %.3f , rho: %.1f \n ", 
+            //         i,  selectedPhotons[i]->p4().Phi() , segP4.Phi(), dPhi_ , rho ) ;
+            if ( fabs(dPhi_) < dPhi ) {
+               dPhi = fabs( dPhi_ ) ;
+               cscRho = rho ;
+            }
+	    //cout<<" ("<< k<<")   gpMag : "<< gpMag <<" eta: "<< gp.eta() << endl ;
+        }
+        //printf(" (%d) dphi: %.3f , rho: %.1f \n ", 
+        //         (int)i,   dPhi , cscRho ) ;
+	leaves.cscRho[i]  = cscRho ;
+	leaves.cscdPhi[i]  = dPhi ;
+        if ( dPhi < 0.1 )  halomatch = true ;
+    }
+    return halomatch ;
+
+}
+
+
+// !!! Only work for RECO - cscSegment is not available for AOD 
 bool DPAnalysis::BeamHaloMatch( Handle<CSCSegmentCollection> cscSeg, vector<const reco::Photon*>& selectedPhotons, const EventSetup& iSetup ) {
 
    ESHandle<CSCGeometry> cscGeom;
@@ -673,9 +721,8 @@ bool DPAnalysis::BeamHaloMatch( Handle<CSCSegmentCollection> cscSeg, vector<cons
    bool halomatch = false ;
    for ( size_t i=0; i< selectedPhotons.size() ; i++ ) {
 
-       if ( leaves.seedTime[i] > -3. ) continue ;
        double dPhi = 99. ;
-       double cscT = 99. ;
+       double cscRho = -1 ;
        for (CSCSegmentCollection::const_iterator it = cscSeg->begin(); it != cscSeg->end(); it++) {
            if ( !it->isValid() ) continue ;
            CSCDetId DetId = it->cscDetId();
@@ -689,20 +736,21 @@ bool DPAnalysis::BeamHaloMatch( Handle<CSCSegmentCollection> cscSeg, vector<cons
            //dEta = ( dEta_ < dEta ) ? dEta_ : dEta ;
            //double dPhi_ = fabs( gp.phi() - selectedPhotons[i]->phi() )  ;
            double dPhi_ = ROOT::Math::VectorUtil::DeltaPhi( segP4, selectedPhotons[i]->p4() ) ;
+	   double rho = sqrt( (gp.x()*gp.x()) + (gp.y()*gp.y()) ) ;
            if ( fabs(dPhi_) < dPhi ) {
               dPhi = fabs( dPhi_ ) ;
-              cscT = it->time() ;
+              cscRho = rho ;
            }
        }
-       if ( dPhi < 0.5 ) {
+       if ( dPhi < 0.1 ) {
           halomatch          = true ;
-          leaves.cscTime[i]  = cscT ;
+          leaves.cscRho[i]  = cscRho ;
           leaves.cscdPhi[i]  = dPhi ;
        }
    }
    return halomatch ;
 }
-*/
+
 
 // return time, timeError
 pair<double,double> DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitCollection> recHitsEB, Handle<EcalRecHitCollection> recHitsEE ) {

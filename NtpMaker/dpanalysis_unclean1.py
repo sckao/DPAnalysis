@@ -12,14 +12,9 @@ process.source = cms.Source("PoolSource",
 
       #'dcache:/pnfs/cms/WAX/11/store/data/Run2012B/SinglePhoton/RECO/PromptReco-v1/000/196/681/700E4F1C-A9BB-E111-8B16-001D09F23174.root',
        'dcache:/pnfs/cms/WAX/11/store/data/Run2012C/SinglePhoton/AOD/PromptReco-v2/000/200/190/1CD40010-5FDF-E111-AAA6-001D09F23F2A.root'
-
-       #'dcache:/pnfs/cms/WAX/11/store/data/Run2012C/SinglePhoton/RECO/PromptReco-v2/000/202/328/10E27F81-DDFA-E111-B6A6-003048D2BC38.root'
        #'dcache:/pnfs/cms/WAX/11/store/data/Run2012B/MET/RECO/PromptReco-v1/000/195/552/04EA349F-5DB1-E111-A002-E0CB4E553651.root' 
        #'dcache:/pnfs/cms/WAX/11/store/data/Run2012B/SingleMu/RECO/PromptReco-v1/000/194/151/020D9700-FE9F-E111-9535-002481E0E56C.root'
-
         #'dcache:/pnfs/cms/WAX/11/store/data/Run2011B/Photon/AOD/PromptReco-v1/000/179/558/5886DB5E-A5FF-E011-92AE-BCAEC5364CFB.root'
-        #'dcache:/pnfs/cms/WAX/resilient/sckao/MC2012/GMSB_L100_CTau1000_8TeV_RECO_10_1_qX9.root'
-        #'dcache:/pnfs/cms/WAX/11/store/data/Run2011A/Photon/AOD/PromptReco-v6/000/173/389/B8BBAB75-A4CA-E011-84BA-BCAEC53296F8.root'
  
     ),
     # explicitly drop photons resident in AOD/RECO, to make sure only those locally re-made (uncleaned photons) are used
@@ -45,6 +40,7 @@ process.ana = cms.EDAnalyzer('DPAnalysis',
     L1Select         = cms.bool( True ),
     isData           = cms.bool(True),
     cscHaloData      = cms.InputTag("CSCHaloData"),
+    staMuons         = cms.InputTag("standAloneMuons"),
     trigSource = cms.InputTag("TriggerResults","","HLT"),
     jetSource   = cms.InputTag("ak5PFJets"),
     metSource   = cms.InputTag("pfMet"),
@@ -56,7 +52,7 @@ process.ana = cms.EDAnalyzer('DPAnalysis',
     beamSpotSource   = cms.InputTag("offlineBeamSpot"),
     EBRecHitCollection = cms.InputTag("reducedEcalRecHitsEB"),
     EERecHitCollection = cms.InputTag("reducedEcalRecHitsEE"),
-    #CSCSegmentCollection = cms.InputTag("cscSegments"),
+    CSCSegmentCollection = cms.InputTag("cscSegments"),
     tau                = cms.double( 1000 ), 
     genParticles = cms.InputTag("genParticles"),
 
@@ -86,7 +82,8 @@ process.GlobalTag.globaltag = 'GR_P_V40::All'
 
 # to get clustering 
 #process.load("Configuration.StandardSequences.Geometry_cff")
-process.load('Configuration/StandardSequences/GeometryExtended_cff')
+process.load('Configuration.Geometry.GeometryAll_cff')
+process.load('Configuration.StandardSequences.GeometryExtended_cff')
 
 # Geometry
 process.load("Geometry.CaloEventSetup.CaloTopology_cfi")

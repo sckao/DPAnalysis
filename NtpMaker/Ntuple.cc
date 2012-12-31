@@ -26,6 +26,12 @@ void setBranchAddresses(TTree* chain, Ntuple& treeVars)
   chain -> SetBranchAddress("metPx",       &treeVars.metPx     );
   chain -> SetBranchAddress("metPy",       &treeVars.metPy     );
   chain -> SetBranchAddress("met",         &treeVars.met       );
+  chain -> SetBranchAddress("met_dx1",     &treeVars.met_dx1    );
+  chain -> SetBranchAddress("met_dy1",     &treeVars.met_dy1    );
+  chain -> SetBranchAddress("met_dx2",     &treeVars.met_dx2    );
+  chain -> SetBranchAddress("met_dy2",     &treeVars.met_dy2    );
+  chain -> SetBranchAddress("met_dx3",     &treeVars.met_dx3    );
+  chain -> SetBranchAddress("met_dy3",     &treeVars.met_dy3    );
 
   // trigger matched objects 
   chain -> SetBranchAddress("t_phoPx",      &treeVars.t_phoPx    );
@@ -73,6 +79,10 @@ void setBranchAddresses(TTree* chain, Ntuple& treeVars)
   chain -> SetBranchAddress("jetCHF",       treeVars.jetCHF    );
   chain -> SetBranchAddress("jetNHF",       treeVars.jetNHF    );
   chain -> SetBranchAddress("jetNEF",       treeVars.jetNEF    );
+  chain -> SetBranchAddress("jerUnc",        treeVars.jerUnc     );
+  chain -> SetBranchAddress("jecUnc",       treeVars.jecUnc    );
+  //chain -> SetBranchAddress("jecUncU",      treeVars.jecUncU  );
+  //chain -> SetBranchAddress("jecUncD",      treeVars.jecUncD  );
   
   chain -> SetBranchAddress("phoPx",        treeVars.phoPx     );
   chain -> SetBranchAddress("phoPy",        treeVars.phoPy     );
@@ -145,6 +155,13 @@ void setBranches(TTree* chain, Ntuple& treeVars)
   chain -> Branch("metPx",       &treeVars.metPx,                "metPx/F");
   chain -> Branch("metPy",       &treeVars.metPy,                "metPy/F");
   chain -> Branch("met",         &treeVars.met,                  "met/F");
+  chain -> Branch("met_dx1",     &treeVars.met_dx1,              "met_dx1/F");
+  chain -> Branch("met_dy1",     &treeVars.met_dy1,              "met_dy1/F");
+  chain -> Branch("met_dx2",     &treeVars.met_dx2,              "met_dx2/F");
+  chain -> Branch("met_dy2",     &treeVars.met_dy2,              "met_dy2/F");
+  chain -> Branch("met_dx3",     &treeVars.met_dx3,              "met_dx3/F");
+  chain -> Branch("met_dy3",     &treeVars.met_dy3,              "met_dy3/F");
+
 
   chain -> Branch("t_metPx",     &treeVars.t_metPx,              "t_metPx/F");
   chain -> Branch("t_metPy",     &treeVars.t_metPy,              "t_metPy/F");
@@ -180,6 +197,10 @@ void setBranches(TTree* chain, Ntuple& treeVars)
   chain -> Branch("jetCHF",       treeVars.jetCHF,                "jetCHF[nJets]/F" );
   chain -> Branch("jetNHF",       treeVars.jetNHF,                "jetNHF[nJets]/F" );
   chain -> Branch("jetNEF",       treeVars.jetNEF,                "jetNEF[nJets]/F" );
+  chain -> Branch("jerUnc",        treeVars.jerUnc,                 "jerUnc[nJets]/F"  );
+  chain -> Branch("jecUnc",       treeVars.jecUnc,                "jecUnc[nJets]/F" );
+  //chain -> Branch("jecUncU",      treeVars.jecUncU,               "jecUncU[nJets]/F" );
+  //chain -> Branch("jecUncD",      treeVars.jecUncD,               "jecUncD[nJets]/F" );
   
   chain -> Branch("phoPx",        treeVars.phoPx,                 "phoPx[nPhotons]/F");
   chain -> Branch("phoPy",        treeVars.phoPy,                 "phoPy[nPhotons]/F");
@@ -261,6 +282,12 @@ void initializeBranches(TTree* chain, Ntuple& treeVars)
   treeVars.metPx = 0 ;
   treeVars.metPy = 0 ;
   treeVars.met   = 0 ;
+  treeVars.met_dx1 = 0 ;
+  treeVars.met_dy1 = 0 ;
+  treeVars.met_dx2 = 0 ;
+  treeVars.met_dy2 = 0 ;
+  treeVars.met_dx3 = 0 ;
+  treeVars.met_dy3 = 0 ;
 
   treeVars.t_metPx = 0 ;
   treeVars.t_metPy = 0 ;
@@ -283,6 +310,10 @@ void initializeBranches(TTree* chain, Ntuple& treeVars)
       treeVars.jetCHF[i] = 0 ;
       treeVars.jetNHF[i] = 0 ;
       treeVars.jetNEF[i] = 0 ;
+      treeVars.jerUnc[i] = 0 ;
+      treeVars.jecUnc[i] = 0 ;
+      //treeVars.jecUncU[i] = 0 ;
+      //treeVars.jecUncD[i] = 0 ;
   }
 
   for ( int i=0; i< MAXELE; i++) {

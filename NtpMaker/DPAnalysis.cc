@@ -43,11 +43,12 @@ DPAnalysis::DPAnalysis(const edm::ParameterSet& iConfig){
    photonSource         = iConfig.getParameter<edm::InputTag> ("photonSource");
    metSource            = iConfig.getParameter<edm::InputTag> ("metSource");
    jetSource            = iConfig.getParameter<edm::InputTag> ("jetSource");
+   patJetSource         = iConfig.getParameter<edm::InputTag> ("patJetSource");
    trackSource          = iConfig.getParameter<edm::InputTag> ("trackSource");
 
    EBRecHitCollection   = iConfig.getParameter<edm::InputTag> ("EBRecHitCollection") ;
    EERecHitCollection   = iConfig.getParameter<edm::InputTag> ("EERecHitCollection") ;
-   //CSCSegmentTag        = iConfig.getParameter<edm::InputTag> ("CSCSegmentCollection") ;
+   CSCSegmentTag        = iConfig.getParameter<edm::InputTag> ("CSCSegmentCollection") ;
    cscHaloTag           = iConfig.getParameter<edm::InputTag> ("cscHaloData");
    staMuons             = iConfig.getParameter<edm::InputTag> ("staMuons");
 
@@ -172,10 +173,6 @@ void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
    bool pass = EventSelection( iEvent, iSetup ) ;
    if ( pass && passTrigger ) counter[7]++ ;   
 
-      // for cscsegments and halo muon/photon studies
-      //Handle<CSCSegmentCollection>       cscSegments ;
-      //iEvent.getByLabel( CSCSegmentTag,  cscSegments );
-      //bool haloMuon = BeamHaloMatch( cscSegments, selectedPhotons, iSetup ) ;
   
    // fill the ntuple
    if ( pass && !isData ) theTree->Fill();
@@ -191,6 +188,7 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent, const edm::EventSetup&
    Handle<reco::GsfElectronCollection> electrons; 
    Handle<reco::MuonCollection>        muons; 
    Handle<reco::PFJetCollection>       jets; 
+   Handle<std::vector<pat::Jet> >      patjets;
    Handle<reco::PFMETCollection>       met; 
    Handle<EcalRecHitCollection>        recHitsEB ;
    Handle<EcalRecHitCollection>        recHitsEE ;
@@ -202,11 +200,13 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent, const edm::EventSetup&
    iEvent.getByLabel( electronSource, electrons);
    iEvent.getByLabel( muonSource,     muons );
    iEvent.getByLabel( jetSource,      jets  );
+   iEvent.getByLabel( patJetSource,   patjets);
    iEvent.getByLabel( metSource,      met  );
    iEvent.getByLabel( EBRecHitCollection,     recHitsEB );
    iEvent.getByLabel( EERecHitCollection,     recHitsEE );
    iEvent.getByLabel("BeamHaloSummary", beamHaloSummary) ;
    iEvent.getByLabel( trackSource,    tracks  );
+
 
    bool passEvent = true ;
 
@@ -242,21 +242,27 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent, const edm::EventSetup&
    }
    CSCHaloCleaning( iEvent, selectedPhotons ) ;
 
-   Handle< edm::OwnVector<TrackingRecHit> >  mu_rhits ;
-   iEvent.getByLabel( staMuons,  mu_rhits );
-   bool haloMuon = BeamHaloMatch( *(mu_rhits.product()), selectedPhotons, iSetup ) ;
-   //if ( haloMuon ) cout<<" haloMuon ! "<<endl ;
+   // for cscsegments and halo muon/photon studies 
+   Handle<CSCSegmentCollection>       cscSegments ;
+   iEvent.getByLabel( CSCSegmentTag,  cscSegments );
+   BeamHaloMatch( cscSegments, selectedPhotons, iSetup ) ;
+   
+   //Handle< edm::OwnVector<TrackingRecHit> >  mu_rhits ;
+   //iEvent.getByLabel( staMuons,  mu_rhits );
+   //bool haloMuon = BeamHaloMatch( *(mu_rhits.product()), selectedPhotons, iSetup ) ;
 
    //IsoPhotonSelection( selectedPhotons ) ;
    //if ( selectedPhotons.size() < photonCuts[5] )  passEvent = false ;
 
    selectedJets.clear() ;
-   JetSelection( jets, selectedPhotons, selectedJets );
+   //JetSelection( jets, selectedPhotons, selectedJets );
+   JetSelection( patjets, selectedPhotons, selectedJets );
    //bool isGammaJets = GammaJetVeto( selectedPhotons, selectedJets ) ;
    //if ( isGammaJets ) passEvent = false ;
    if ( selectedJets.size() < jetCuts[3] )   passEvent = false ;
    if ( passEvent )   counter[5]++ ;   
    
+   //JERUncertainty( patjets ) ;
    selectedElectrons.clear() ;
    ElectronSelection( electrons, selectedElectrons ) ;
 
@@ -512,7 +518,6 @@ bool DPAnalysis::VertexSelection( Handle<reco::VertexCollection> vtx ) {
     int thisVertex=0;
     bool hasGoodVertex = true ;
     int totalN_vtx = 0 ;
-
     for(reco::VertexCollection::const_iterator v=vtx->begin();  v!=vtx->end() ; v++){
 
        if ( ! v->isValid() ||  v->isFake() ) continue ;
@@ -547,10 +552,19 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
 
    int k= 0 ;
    double maxPt = 0 ;
+   double met_dx(0), met_dy(0), met_ux(0), met_uy(0); 
    for(reco::PhotonCollection::const_iterator it = photons->begin(); it != photons->end(); it++) {
 
+       // calculate met uncertainty
+       if ( it->pt() < 10. ) continue ;
+       met_dx += it->px() ;
+       met_dy += it->py() ;
+       double ptscale = ( it->isEB() ) ? 0.994 : 0.985;
+       met_dx -= ( it->px() * ptscale ) ;
+       met_dy -= ( it->py() * ptscale ) ;
+
        // fiducial cuts
-       if ( k >= MAXPHO ) break ;
+       if ( k >= MAXPHO ) continue ;
        if ( it->pt() < photonCuts[0] || fabs( it->eta() ) > photonCuts[1] ) continue ;
        //float hcalIsoRatio = it->hcalTowerSumEtConeDR04() / it->pt() ;
        //if  ( ( hcalIsoRatio + it->hadronicOverEm() )*it->energy() >= 6.0 ) continue ;
@@ -661,6 +675,8 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
        k++ ;
    }
    leaves.nPhotons = k ;
+   leaves.met_dx3  += met_dx ;
+   leaves.met_dy3  += met_dy ;
    //leaves.nPhotons = (int)( selectedPhotons.size() ) ;
 
    if ( selectedPhotons.size() > 0 && maxPt >= photonCuts[7] )  return true ; 
@@ -742,11 +758,10 @@ bool DPAnalysis::BeamHaloMatch( Handle<CSCSegmentCollection> cscSeg, vector<cons
               cscRho = rho ;
            }
        }
-       if ( dPhi < 0.1 ) {
-          halomatch          = true ;
-          leaves.cscRho[i]  = cscRho ;
-          leaves.cscdPhi[i]  = dPhi ;
-       }
+       if ( dPhi < 0.1 )  halomatch = true ;
+       leaves.cscRho[i]  = cscRho ;
+       leaves.cscdPhi[i]  = dPhi ;
+
    }
    return halomatch ;
 }
@@ -985,8 +1000,6 @@ void DPAnalysis::EventTime( const edm::Event& iEvent ) {
    }
 
 }
-*/
-/*
 double DPAnalysis::HLTMET( Handle<reco::PFJetCollection> jets, vector<const reco::Muon*>& selectedMuons , bool addMuon ) {
 
    double hltHT  = 0. ;
@@ -1045,6 +1058,8 @@ bool DPAnalysis::JetSelection( Handle<reco::PFJetCollection> jets, vector<const 
        }
        if ( dR <= jetCuts[2] ) continue ;
 
+       vector<double> uncV = JECUncertainty( it->pt(), it->eta() ) ;
+
        if ( k >= MAXJET ) break ;
        selectedJets.push_back( &(*it) ) ;
        leaves.jetPx[k] = it->p4().Px() ;
@@ -1056,6 +1071,9 @@ bool DPAnalysis::JetSelection( Handle<reco::PFJetCollection> jets, vector<const 
        leaves.jetCEF[k]  = it->chargedEmEnergyFraction() ;
        leaves.jetNHF[k]  = it->neutralHadronEnergyFraction() ;  
        leaves.jetNEF[k]  = it->neutralEmEnergyFraction() ;
+       //leaves.jecUncU[k]  = uncV[0] ;
+       //leaves.jecUncD[k]  = uncV[1] ;
+       leaves.jecUnc[k]  = uncV[2] ;
        k++ ;
    }
    leaves.nJets = (int)( selectedJets.size() ) ;
@@ -1065,14 +1083,206 @@ bool DPAnalysis::JetSelection( Handle<reco::PFJetCollection> jets, vector<const 
 
 }
 
+bool DPAnalysis::JetSelection( Handle< vector<pat::Jet> > patjets, vector<const reco::Photon*>& selectedPhotons, 
+                                          vector< pat_Jet* >& selectedJets_ ) {
+
+   int k = 0 ;
+   double met_dx(0), met_dy(0) ;
+   double met_sx(0), met_sy(0) ;
+   double SF = 1. ;
+   for (std::vector<pat::Jet>::const_iterator it = patjets->begin(); it != patjets->end(); it++) {
+ 
+       bool passPtCut = it->pt() > jetCuts[0] ;
+       // calculate JER uncertainty 
+       double ptscale = 1 ;
+       double dPt = 0 ;
+       if ( !isData ) {
+          const reco::GenJet* matchedGenJet = it->genJet() ;
+	  if ( it->pt() < 10. ) continue ;
+	  if ( matchedGenJet == NULL ) continue ;
+
+	  met_dx += it->px() ;
+	  met_dy += it->py() ;
+
+	  // This is data/MC ratio
+	  if ( fabs(it->eta()) < 0.5 ) SF = 1.052 ;
+	  if ( fabs(it->eta()) >= 0.5 && fabs(it->eta()) < 1.1 ) SF = 1.057 ;
+	  if ( fabs(it->eta()) >= 1.1 && fabs(it->eta()) < 1.7 ) SF = 1.096 ;
+	  if ( fabs(it->eta()) >= 1.7 && fabs(it->eta()) < 2.3 ) SF = 1.134 ;
+	  if ( fabs(it->eta()) >= 2.3 && fabs(it->eta()) < 2.5 ) SF = 1.288 ;
+	  dPt = ( it->pt() - matchedGenJet->pt() )*(1-SF) ;
+	  ptscale = max( 0.0, ( it->pt() + dPt)/it->pt() ) ;
+
+	  met_dx -= ( it->px() * ptscale ) ;
+	  met_dy -= ( it->py() * ptscale ) ;
+       }
+       if ( (it->pt() + dPt) > jetCuts[0] || (it->pt() - dPt) > jetCuts[0] ) passPtCut = true ;
+
+       // Calculate JES uncertainty
+       vector<double> uncV = JECUncertainty( it->pt(), it->eta() ) ;
+       if ( (it->pt() + uncV[2]) > jetCuts[0] || (it->pt() - uncV[2] ) > jetCuts[0] ) passPtCut = true ;
+       met_sx += it->px() ;
+       met_sy += it->py() ;
+       double jes_sc = ( it->pt() + uncV[2] ) / it->pt() ;
+       met_sx -= it->px() * jes_sc ;
+       met_sy -= it->py() * jes_sc ;
+
+       // Pt and Fiducial cuts - include those within JES and JER range
+       if ( !passPtCut || fabs( it->eta() ) > jetCuts[1] ) continue ;
+
+       // Jet ID cuts
+       //if ( it->numberOfDaughters() < 2 )               continue ;
+       //if ( it->chargedEmEnergyFraction() >= 0.99 )     continue ;
+       //if ( it->neutralHadronEnergyFraction() >= 0.99 ) continue ;
+       //if ( it->neutralEmEnergyFraction() >= 0.99 )     continue ;
+       //if ( fabs( it->eta() ) < 2.4 && it->chargedHadronEnergyFraction() <=0 ) continue ;
+       //if ( fabs( it->eta() ) < 2.4 && it->chargedMultiplicity() <=0 ) continue ;
+       
+       // dR cuts 
+       double dR = 999 ;
+       for (size_t j=0; j < selectedPhotons.size(); j++ ) {
+           double dR_ =  ROOT::Math::VectorUtil::DeltaR( it->p4(), selectedPhotons[j]->p4() ) ;
+           if ( dR_ < dR ) dR = dR_ ;
+       }
+       if ( dR <= jetCuts[2] ) continue ;
+
+
+       if ( k >= MAXJET ) continue ;
+       selectedJets_.push_back( &(*it) ) ;
+       leaves.jetPx[k] = it->p4().Px() ;
+       leaves.jetPy[k] = it->p4().Py() ;
+       leaves.jetPz[k] = it->p4().Pz() ;
+       leaves.jetE[k]  = it->p4().E()  ;
+       leaves.jetNDau[k] = it->numberOfDaughters() ;
+       leaves.jetCM[k]   = it->chargedMultiplicity() ;
+       leaves.jetCEF[k]  = it->chargedEmEnergyFraction() ;
+       leaves.jetNHF[k]  = it->neutralHadronEnergyFraction() ;  
+       leaves.jetNEF[k]  = it->neutralEmEnergyFraction() ;
+       //leaves.jecUncU[k]  = uncV[0] ;
+       //leaves.jecUncD[k]  = uncV[1] ;
+       leaves.jecUnc[k]  = uncV[2] ;
+       leaves.jerUnc[k]  = dPt ;
+       k++ ;
+   }
+   leaves.nJets = (int)( selectedJets.size() ) ;
+   leaves.met_dx1    = met_dx  ;
+   leaves.met_dy1    = met_dy  ;
+   leaves.met_dx2    = met_sx  ;
+   leaves.met_dy2    = met_sy  ;
+
+   if ( selectedJets.size() > 0 )  return true ; 
+   else                            return false ;    
+
+}
+
+
+vector<double> DPAnalysis::JECUncertainty( double jetpt, double jeteta ) {
+
+  const int nsrc = 19;
+  const char* srcnames[nsrc] =
+  {"Absolute", "HighPtExtra", "SinglePionECAL", "SinglePionHCAL", "Flavor", "Time", 
+   "RelativeJEREC1", "RelativeJEREC2", "RelativeJERHF", "RelativePtEC1", "RelativePtEC2", "RelativePtHF",
+   "RelativeStatEC2", "RelativeStatHF","PileUpDataMC", "PileUpBias", "PileUpPtBB", "PileUpPtEC", "PileUpPtHF"};
+
+  std::vector<JetCorrectionUncertainty*> vsrc(nsrc);
+
+  double sum2_max(0), sum2_up(0), sum2_dw(0);
+  for (int isrc = 0; isrc < nsrc; isrc++) {
+      const char *name = srcnames[isrc];
+      JetCorrectorParameters *p = new JetCorrectorParameters("Fall12_V6_DATA_UncertaintySources_AK5PFchs.txt", name);
+      JetCorrectionUncertainty *unc = new JetCorrectionUncertainty(*p);
+      unc->setJetPt( jetpt);
+      unc->setJetEta( jeteta);
+      double sup = unc->getUncertainty(true); // up variation
+      unc->setJetPt(jetpt);
+      unc->setJetEta(jeteta);
+      double sdw = unc->getUncertainty(false); // down variation
+
+      sum2_up += pow(sup,2);
+      sum2_dw += pow(sdw,2);
+      sum2_max += pow(max(sup,sdw),2);
+
+      delete p ;
+      delete unc ;
+  } 
+  double Unc_up  = sqrt( sum2_up ) ;
+  double Unc_dw  = sqrt( sum2_dw ) ;
+  double Unc_max = sqrt( sum2_max ) ;
+
+  vector<double> UncV ;
+  UncV.push_back( Unc_up ) ;
+  UncV.push_back( Unc_dw ) ;
+  UncV.push_back( Unc_max ) ;
+    
+  return UncV ;
+
+}
+
+
+//double DPAnalysis::JERUncertainty( double jetpt, double jeteta ) {
+void DPAnalysis::JERUncertainty( Handle< std::vector<pat::Jet> > patjets ) {
+
+   //cout<<" ============= "<<endl ;
+   double met_x = 0 ;
+   double met_y = 0 ;
+   double SF = 1. ;
+   for (std::vector<pat::Jet>::const_iterator it = patjets->begin(); it != patjets->end(); it++) {
+ 
+       const reco::GenJet* matchedGenJet = it->genJet() ;
+       if ( it->pt() < 10 ) continue ;
+       if ( matchedGenJet == NULL ) continue ;
+
+       met_x += it->px() ;
+       met_y += it->py() ;
+       
+       // This is data/MC ratio
+       if ( fabs(it->eta()) < 0.5 ) SF = 1.052 ;
+       if ( fabs(it->eta()) >= 0.5 && fabs(it->eta()) < 1.1 ) SF = 1.057 ;
+       if ( fabs(it->eta()) >= 1.1 && fabs(it->eta()) < 1.7 ) SF = 1.096 ;
+       if ( fabs(it->eta()) >= 1.7 && fabs(it->eta()) < 2.3 ) SF = 1.134 ;
+       if ( fabs(it->eta()) >= 2.3 && fabs(it->eta()) < 2.5 ) SF = 1.288 ;
+       double dPt = ( it->pt() - matchedGenJet->pt() )*(1-SF) ;
+       double ptscale = max( 0.0, ( it->pt() + dPt)/it->pt() ) ;
+
+       double newPt = it->pt() * ptscale ;
+       met_x -= ( it->px() * ptscale ) ;
+       met_y -= ( it->py() * ptscale ) ;
+       printf(" reco pt: %.1f, gen pt: %.1f  newPt: %.1f \n ", it->pt() , matchedGenJet->pt(), newPt ) ;
+       /*
+       if ( matchedGenJet != NULL ) printf(" reco pt: %.1f, gen pt: %.1f \n ", it->pt() , matchedGenJet->pt() ) ;
+
+       if ( it->isPFJet() && matchedGenJet == NULL ) { 
+          printf(" reco pt: %.1f but no gen jets \n", it->pt() ) ;
+	  if ( it->isMuon() ) cout<<" it's muon "<<endl ; 
+	  if ( it->isElectron() ) cout<<" it's electron "<<endl ; 
+	  if ( it->isPhoton() ) cout<<" it's photon "<<endl ; 
+       }
+       */
+   }
+	  
+}
+
+
 bool DPAnalysis::ElectronSelection( Handle<reco::GsfElectronCollection> electrons, 
                                     vector<const reco::GsfElectron*>& selectedElectrons ) {
 
    // Electron Identification Based on Simple Cuts
    // https://twiki.cern.ch/twiki/bin/view/CMS/SimpleCutBasedEleID#Selections_and_How_to_use_them
    int k = 0 ;
+   double met_dx(0), met_dy(0) ;
    for(reco::GsfElectronCollection::const_iterator it = electrons->begin(); it != electrons->end(); it++) {
+
+       // calculate met uncertainty
+       if ( it->pt() < 10. ) continue ;
+       met_dx += it->px() ;
+       met_dy += it->py() ;
+       double ptscale = ( it->isEB() ) ? 1.006 : 1.015;
+       met_dx -= ( it->px() * ptscale ) ;
+       met_dy -= ( it->py() * ptscale ) ;
+
+
        if ( it->pt() < electronCuts[0] || fabs( it->eta() ) > electronCuts[1] ) continue ;
+
        // Isolation Cuts
        float ecalSumEt = ( it->isEB() ) ? max(0., it->dr03EcalRecHitSumEt() - 1. ) : it->dr03EcalRecHitSumEt();
        float hcalSumEt = it->dr03HcalTowerSumEt();
@@ -1097,6 +1307,8 @@ bool DPAnalysis::ElectronSelection( Handle<reco::GsfElectronCollection> electron
        k++;
    }
    leaves.nElectrons = (int)( selectedElectrons.size() ) ;
+   leaves.met_dx3  += met_dx ;
+   leaves.met_dy3  += met_dy ;
 
    if ( selectedElectrons.size() > 0 )  return true ; 
    else                                 return false ;    

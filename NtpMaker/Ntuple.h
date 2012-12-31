@@ -5,7 +5,7 @@
 
 #define MAXVTX 10
 #define MAXJET 15
-#define MAXPHO 10
+#define MAXPHO 12
 #define MAXMU 5
 #define MAXELE 5
 #define MAXGEN 20
@@ -55,10 +55,20 @@ struct Ntuple
   float jetCHF[MAXJET];
   float jetNHF[MAXJET];
   float jetNEF[MAXJET];
+  float jecUnc[MAXJET];
+  float jerUnc[MAXJET];
+  //float jecUncU[MAXJET];
+  //float jecUncD[MAXJET];
   
   float metPx;
   float metPy;
   float met;
+  float met_dx1;
+  float met_dy1;
+  float met_dx2;
+  float met_dy2;
+  float met_dx3;
+  float met_dy3;
 
   float t_metPx;
   float t_metPy;

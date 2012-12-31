@@ -111,6 +111,19 @@
 #include "RecoEcal/EgammaCoreTools/interface/EcalTools.h"
 #include "CalibCalorimetry/EcalTiming/interface/timeVsAmpliCorrector.h"
 
+// JEC uncerntainties
+#include "CondFormats/JetMETObjects/interface/JetCorrectorParameters.h"
+#include "CondFormats/JetMETObjects/interface/JetCorrectionUncertainty.h"
+
+// for PAT Object selections
+#include "DataFormats/PatCandidates/interface/PATObject.h"
+#include "DataFormats/PatCandidates/interface/Jet.h"
+#include "DataFormats/PatCandidates/interface/MET.h"
+#include "DataFormats/PatCandidates/interface/Muon.h"
+#include "DataFormats/PatCandidates/interface/Electron.h"
+#include "DataFormats/PatCandidates/interface/Photon.h"
+#include "DataFormats/EgammaCandidates/interface/Photon.h"
+
 // PU SummeryInfo
 //#include "SimDataFormats/PileupSummaryInfo/interface/PileupSummaryInfo.h" 
 
@@ -140,9 +153,9 @@ struct PhoInfo {
   int    nxtals ;  
   int    nBC    ;
 
-
 } ;
 
+typedef const pat::Jet pat_Jet ;
 
 class DPAnalysis : public edm::EDAnalyzer {
    public:
@@ -175,7 +188,14 @@ class DPAnalysis : public edm::EDAnalyzer {
       //double HLTMET( edm::Handle<reco::PFJetCollection> jets, vector<const reco::Muon*>& selectedMuons, bool addMuon = false ) ;
 
       bool JetSelection( edm::Handle<reco::PFJetCollection> jets, vector<const reco::Photon*>& selectedPhotons,
-                                                                     vector<const reco::PFJet*>& selectedJets ) ;
+                                                                  vector<const reco::PFJet*>& selectedJets ) ;
+
+      bool JetSelection( edm::Handle<std::vector<pat::Jet> > patjets, vector<const reco::Photon*>& selectedPhotons, 
+                            vector< pat_Jet* >& selectedJets_ ) ;
+
+      vector<double> JECUncertainty( double jetpt, double jeteta ) ;
+      void JERUncertainty( edm::Handle< std::vector<pat::Jet> > patjets )  ;
+
       bool ElectronSelection( edm::Handle<reco::GsfElectronCollection> electrons, 
                               vector<const reco::GsfElectron*>& selectedElectrons ) ;
       bool MuonSelection( edm::Handle<reco::MuonCollection> muons, vector<const reco::Muon*>& selectedMuons ) ;
@@ -216,11 +236,12 @@ class DPAnalysis : public edm::EDAnalyzer {
       edm::InputTag photonSource;
       edm::InputTag metSource;
       edm::InputTag jetSource;
+      edm::InputTag patJetSource;
       edm::InputTag trackSource;
 
       edm::InputTag EBRecHitCollection;
       edm::InputTag EERecHitCollection;
-      //edm::InputTag CSCSegmentTag ;
+      edm::InputTag CSCSegmentTag ;
       edm::InputTag cscHaloTag ;
       edm::InputTag staMuons ;
       //edm::InputTag pileupSource ;
@@ -239,7 +260,8 @@ class DPAnalysis : public edm::EDAnalyzer {
       std::vector<double> jetCuts ; 
       std::vector<double> vtxCuts ; 
 
-      std::vector<const reco::PFJet*> selectedJets ;
+      //std::vector<const reco::PFJet*> selectedJets ;
+      std::vector<pat_Jet*> selectedJets ;
       std::vector<const reco::GsfElectron*> selectedElectrons ;
       std::vector<const reco::Muon*> selectedMuons ;
       std::vector<const reco::Photon*> selectedPhotons ;

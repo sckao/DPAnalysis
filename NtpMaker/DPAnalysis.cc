@@ -63,8 +63,9 @@ DPAnalysis::DPAnalysis(const edm::ParameterSet& iConfig){
    muonCuts             = iConfig.getParameter<std::vector<double> >("muonCuts");  
    //triggerPatent        = iConfig.getUntrackedParameter<string> ("triggerName");
    triggerPatent        = iConfig.getParameter< std::vector<string> >("triggerName");
-   isData               = iConfig.getParameter<bool> ("isData");
    L1Select             = iConfig.getParameter<bool> ("L1Select");
+   isData               = iConfig.getParameter<bool> ("isData");
+   tau                  = iConfig.getParameter<double> ("tau");
 
    const InputTag TrigEvtTag("hltTriggerSummaryAOD","","HLT");
    trigEvent            = iConfig.getUntrackedParameter<edm::InputTag>("triggerEventTag", TrigEvtTag);
@@ -142,6 +143,12 @@ void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
    }
    */
 
+   // Get the JES Uncertainty
+   edm::ESHandle<JetCorrectorParametersCollection> JetCorParColl;
+   iSetup.get<JetCorrectionsRecord>().get("AK5PF",JetCorParColl); 
+   JetCorrectorParameters const & JetCorPar = (*JetCorParColl)["Uncertainty"];
+   jecUnc = new JetCorrectionUncertainty(JetCorPar);
+
    if (counter[0] == 0 )  PrintTriggers( iEvent ) ;
 
    int run_id    = iEvent.id().run()  ;
@@ -164,7 +171,7 @@ void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
    if ( passTrigger ) counter[1]++ ;  
 
    // get the generator information
-   if ( !isData ) { 
+   if ( !isData && tau > -0.1 ) { 
       gen->GetGenEvent( iEvent, leaves );
       //gen->GetGen( iEvent, leaves );
    }
@@ -552,14 +559,15 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
 
    int k= 0 ;
    double maxPt = 0 ;
-   double met_dx(0), met_dy(0), met_ux(0), met_uy(0); 
+   double met_dx(0), met_dy(0) ; 
    for(reco::PhotonCollection::const_iterator it = photons->begin(); it != photons->end(); it++) {
 
        // calculate met uncertainty
        if ( it->pt() < 10. ) continue ;
        met_dx += it->px() ;
        met_dy += it->py() ;
-       double ptscale = ( it->isEB() ) ? 0.994 : 0.985;
+       //double ptscale = ( it->isEB() ) ? 0.994 : 0.985;
+       double ptscale = ( it->isEB() ) ? 1.006 : 1.015 ;
        met_dx -= ( it->px() * ptscale ) ;
        met_dy -= ( it->py() * ptscale ) ;
 
@@ -1058,7 +1066,7 @@ bool DPAnalysis::JetSelection( Handle<reco::PFJetCollection> jets, vector<const 
        }
        if ( dR <= jetCuts[2] ) continue ;
 
-       vector<double> uncV = JECUncertainty( it->pt(), it->eta() ) ;
+       vector<double> uncV = JECUncertainty( it->pt(), it->eta(), jecUnc ) ;
 
        if ( k >= MAXJET ) break ;
        selectedJets.push_back( &(*it) ) ;
@@ -1119,8 +1127,8 @@ bool DPAnalysis::JetSelection( Handle< vector<pat::Jet> > patjets, vector<const 
        if ( (it->pt() + dPt) > jetCuts[0] || (it->pt() - dPt) > jetCuts[0] ) passPtCut = true ;
 
        // Calculate JES uncertainty
-       vector<double> uncV = JECUncertainty( it->pt(), it->eta() ) ;
-       if ( (it->pt() + uncV[2]) > jetCuts[0] || (it->pt() - uncV[2] ) > jetCuts[0] ) passPtCut = true ;
+       vector<double> uncV = JECUncertainty( it->pt(), it->eta(), jecUnc ) ;
+       if ( (it->pt() + (uncV[2]*it->pt()) ) > jetCuts[0] || (it->pt() - (uncV[2]*it->pt()) ) > jetCuts[0] ) passPtCut = true ;
        met_sx += it->px() ;
        met_sy += it->py() ;
        double jes_sc = ( it->pt() + uncV[2] ) / it->pt() ;
@@ -1175,6 +1183,28 @@ bool DPAnalysis::JetSelection( Handle< vector<pat::Jet> > patjets, vector<const 
 
 }
 
+vector<double> DPAnalysis::JECUncertainty( double jetpt, double jeteta, JetCorrectionUncertainty* unc ) {
+
+      unc->setJetPt( jetpt);
+      unc->setJetEta( jeteta);
+      double sup = unc->getUncertainty(true); // up variation
+      unc->setJetPt(jetpt);
+      unc->setJetEta(jeteta);
+      double sdw = unc->getUncertainty(false); // down variation
+
+      double Unc_up  =  sup  ;
+      double Unc_dw  =  sdw  ;
+      double Unc_max =  max(sup,sdw)  ;
+
+      vector<double> UncV ;
+      UncV.push_back( Unc_up ) ;
+      UncV.push_back( Unc_dw ) ;
+      UncV.push_back( Unc_max ) ;
+
+      //cout<<" method 1 ->  max unc : "<< Unc_max <<" up = "<< Unc_up << " dw = "<< Unc_dw << endl ;   
+ 
+      return UncV ;
+}
 
 vector<double> DPAnalysis::JECUncertainty( double jetpt, double jeteta ) {
 
@@ -1189,7 +1219,7 @@ vector<double> DPAnalysis::JECUncertainty( double jetpt, double jeteta ) {
   double sum2_max(0), sum2_up(0), sum2_dw(0);
   for (int isrc = 0; isrc < nsrc; isrc++) {
       const char *name = srcnames[isrc];
-      JetCorrectorParameters *p = new JetCorrectorParameters("Fall12_V6_DATA_UncertaintySources_AK5PFchs.txt", name);
+      JetCorrectorParameters *p = new JetCorrectorParameters("/uscms/home/sckao/work/Exotica/CMSSW_5_3_7_patch4/src/EXO/DPAnalysis/test/GMSB/Fall12_V6_DATA_UncertaintySources_AK5PFchs.txt", name);
       JetCorrectionUncertainty *unc = new JetCorrectionUncertainty(*p);
       unc->setJetPt( jetpt);
       unc->setJetEta( jeteta);
@@ -1202,12 +1232,15 @@ vector<double> DPAnalysis::JECUncertainty( double jetpt, double jeteta ) {
       sum2_dw += pow(sdw,2);
       sum2_max += pow(max(sup,sdw),2);
 
-      delete p ;
-      delete unc ;
+      //delete p ;
+      //delete unc ;
   } 
   double Unc_up  = sqrt( sum2_up ) ;
   double Unc_dw  = sqrt( sum2_dw ) ;
   double Unc_max = sqrt( sum2_max ) ;
+
+  //cout<<" method 2 ->  max unc : "<< Unc_max <<" up = "<< Unc_up << " dw = "<< Unc_dw << endl ;   
+  //cout<<" "<<endl ;
 
   vector<double> UncV ;
   UncV.push_back( Unc_up ) ;

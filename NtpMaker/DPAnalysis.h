@@ -114,6 +114,7 @@
 // JEC uncerntainties
 #include "CondFormats/JetMETObjects/interface/JetCorrectorParameters.h"
 #include "CondFormats/JetMETObjects/interface/JetCorrectionUncertainty.h"
+#include "JetMETCorrections/Objects/interface/JetCorrectionsRecord.h"
 
 // for PAT Object selections
 #include "DataFormats/PatCandidates/interface/PATObject.h"
@@ -193,6 +194,7 @@ class DPAnalysis : public edm::EDAnalyzer {
       bool JetSelection( edm::Handle<std::vector<pat::Jet> > patjets, vector<const reco::Photon*>& selectedPhotons, 
                             vector< pat_Jet* >& selectedJets_ ) ;
 
+      vector<double> JECUncertainty( double jetpt, double jeteta, JetCorrectionUncertainty* unc ) ;
       vector<double> JECUncertainty( double jetpt, double jeteta ) ;
       void JERUncertainty( edm::Handle< std::vector<pat::Jet> > patjets )  ;
 
@@ -226,6 +228,7 @@ class DPAnalysis : public edm::EDAnalyzer {
       bool isData ;
       bool L1Select ;
       string l1GTSource ;
+      double tau ;
 
       edm::InputTag trigSource;
       edm::InputTag trigEvent;
@@ -251,6 +254,9 @@ class DPAnalysis : public edm::EDAnalyzer {
       edm::ESHandle<EcalLaserDbService> laser;
       edm::ESHandle<CaloGeometry> pGeometry ;
       const CaloGeometry * theGeometry ;
+
+      // For JES Uncertainty
+      JetCorrectionUncertainty *jecUnc ;
 
       std::vector<double> muonCuts ;
       std::vector<double> electronCuts ;

@@ -16,6 +16,7 @@
 <use name="CondCore/DBCommon"/>
 <use name="CondCore/DBOutputService"/>
 <use name="CondFormats/JetMETObjects"/>
+<use name="JetMETCorrections/Objects"/>
 <use name="clhep"/>
 <use name="root"/>
 <flags EDM_PLUGIN="1"/>

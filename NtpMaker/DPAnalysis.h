@@ -49,6 +49,7 @@
 // AOD Objects
 #include "DataFormats/JetReco/interface/PFJetCollection.h"
 #include "DataFormats/VertexReco/interface/VertexFwd.h"
+#include "DataFormats/BeamSpot/interface/BeamSpot.h"
 
 #include "DataFormats/METReco/interface/PFMET.h"
 #include "DataFormats/METReco/interface/PFMETCollection.h"
@@ -125,6 +126,11 @@
 #include "DataFormats/PatCandidates/interface/Photon.h"
 #include "DataFormats/EgammaCandidates/interface/Photon.h"
 
+#include "RecoEgamma/EgammaTools/interface/ConversionTools.h"
+
+#include "EGamma/EGammaAnalysisTools/src/PFIsolationEstimator.cc"
+
+
 // PU SummeryInfo
 //#include "SimDataFormats/PileupSummaryInfo/interface/PileupSummaryInfo.h" 
 
@@ -157,6 +163,8 @@ struct PhoInfo {
 } ;
 
 typedef const pat::Jet pat_Jet ;
+
+class ConversionTools ;
 
 class DPAnalysis : public edm::EDAnalyzer {
    public:
@@ -213,6 +221,10 @@ class DPAnalysis : public edm::EDAnalyzer {
       bool BeamHaloMatch( edm::Handle<CSCSegmentCollection> cscSeg, vector<const reco::Photon*>& selectedPhotons, const edm::EventSetup& iSetup ) ;
       bool BeamHaloMatch( edm::OwnVector<TrackingRecHit> rhits, vector<const reco::Photon*>& selectedPhotons, const edm::EventSetup& iSetup ) ;
 
+      bool ConversionVeto( const reco::Photon* thePhoton ) ;
+      double RhoCorrection( int type , double eta ) ;
+      void PhotonPFIso( std::vector<const reco::Photon*> thePhotons, const reco::PFCandidateCollection* pfParticlesColl, reco::VertexRef vtxRef, edm::Handle< reco::VertexCollection > vtxColl ) ;
+
    private:
 
       Ntuple leaves ;
@@ -247,13 +259,25 @@ class DPAnalysis : public edm::EDAnalyzer {
       edm::InputTag CSCSegmentTag ;
       edm::InputTag cscHaloTag ;
       edm::InputTag staMuons ;
-      //edm::InputTag pileupSource ;
 
+      //edm::InputTag pileupSource ;
       edm::ESHandle<EcalIntercalibConstants> ical;
       edm::ESHandle<EcalADCToGeVConstant> agc;
       edm::ESHandle<EcalLaserDbService> laser;
       edm::ESHandle<CaloGeometry> pGeometry ;
       const CaloGeometry * theGeometry ;
+
+      // PFIso use
+      edm::Handle<double> rho_ ;   
+      double rhoIso ;
+      PFIsolationEstimator isolator;
+
+
+      // photon conversion veto 
+      const reco::BeamSpot* beamspot ;
+      edm::Handle<reco::ConversionCollection> hConversions;
+      edm::Handle<reco::BeamSpot> bsHandle;
+      edm::Handle<reco::GsfElectronCollection> electrons;
 
       // For JES Uncertainty
       JetCorrectionUncertainty *jecUnc ;

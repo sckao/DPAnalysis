@@ -104,6 +104,9 @@ struct Ntuple
   float phoEcalIso[MAXPHO];
   float phoHcalIso[MAXPHO];
   float phoTrkIso[MAXPHO];
+  float cHadIso[MAXPHO] ;
+  float nHadIso[MAXPHO] ;
+  float photIso[MAXPHO] ;
   float dR_TrkPho[MAXPHO];
   float pt_TrkPho[MAXPHO];
   float phoHoverE[MAXPHO];

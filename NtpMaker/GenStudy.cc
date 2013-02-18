@@ -13,7 +13,7 @@
 //
 // Original Author:  Shih-Chuan Kao
 //         Created:  Thu Mar 15 12:51:07 CDT 2012
-// $Id$
+// $Id: GenStudy.cc,v 1.15 2012/12/31 22:45:14 sckao Exp $
 //
 //
 
@@ -76,7 +76,7 @@ void GenStudy::PrintGenEvent(const edm::Event& iEvent ) {
     
 }
 
-// From GenEvent , time in ns, length in cm
+// From GenEvent , time in ns, length in mm
 void GenStudy::GetGenEvent(const edm::Event& iEvent, Ntuple& leaves, bool debug ) {
 
    Handle<edm::HepMCProduct> HepMCEvt;

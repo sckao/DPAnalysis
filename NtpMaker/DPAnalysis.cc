@@ -1,5 +1,4 @@
 // -*- C++ -*-
-//
 // Package:    DPAnalysis
 // Class:      DPAnalysis
 // 
@@ -21,6 +20,12 @@
 // system include files
 #include "DPAnalysis.h"
 #include "Ntuple.h"
+#include "RecoEgamma/EgammaTools/interface/ConversionTools.h"
+// For PFIsolation
+#include "DataFormats/RecoCandidate/interface/IsoDepositDirection.h"
+#include "DataFormats/RecoCandidate/interface/IsoDeposit.h"
+#include "DataFormats/RecoCandidate/interface/IsoDepositVetos.h"
+#include "DataFormats/PatCandidates/interface/Isolation.h"
 
 using namespace cms ;
 using namespace edm ;
@@ -53,7 +58,6 @@ DPAnalysis::DPAnalysis(const edm::ParameterSet& iConfig){
    staMuons             = iConfig.getParameter<edm::InputTag> ("staMuons");
 
    //pileupSource         = iConfig.getParameter<edm::InputTag>("addPileupInfo");
-
    vtxCuts              = iConfig.getParameter<std::vector<double> >("vtxCuts");
    jetCuts              = iConfig.getParameter<std::vector<double> >("jetCuts");
    metCuts              = iConfig.getParameter<std::vector<double> >("metCuts");
@@ -90,6 +94,13 @@ DPAnalysis::DPAnalysis(const edm::ParameterSet& iConfig){
    runID_ = 0 ;
 
    debugT = false ;
+   rhoIso = 0 ;
+   beamspot = 0 ;
+
+   // shitty PF isolation
+   isolator.initializePhotonIsolation(kTRUE);
+   isolator. setConeSize(0.3);
+
 }
 
 
@@ -143,9 +154,22 @@ void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
    }
    */
 
+   // For conversion veto
+   //Handle<reco::BeamSpot> bsHandle;
+   iEvent.getByLabel( beamSpotSource, bsHandle);
+   beamspot = bsHandle.product();
+
+   //Handle<reco::ConversionCollection> hConversions;
+   iEvent.getByLabel("allConversions", hConversions);
+   iEvent.getByLabel( electronSource, electrons);
+
+   // For PFIso
+   iEvent.getByLabel( "kt6PFJets", "rho", rho_ );
+   rhoIso = *(rho_.product());
+
    // Get the JES Uncertainty
    edm::ESHandle<JetCorrectorParametersCollection> JetCorParColl;
-   iSetup.get<JetCorrectionsRecord>().get("AK5PF",JetCorParColl); 
+   iSetup.get<JetCorrectionsRecord>().get("AK5PFchs",JetCorParColl); 
    JetCorrectorParameters const & JetCorPar = (*JetCorParColl)["Uncertainty"];
    jecUnc = new JetCorrectionUncertainty(JetCorPar);
 
@@ -192,7 +216,7 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent, const edm::EventSetup&
    Handle<edm::TriggerResults>         triggers;
    Handle<reco::VertexCollection>      recVtxs;
    Handle<reco::PhotonCollection>      photons; 
-   Handle<reco::GsfElectronCollection> electrons; 
+   //Handle<reco::GsfElectronCollection> electrons; 
    Handle<reco::MuonCollection>        muons; 
    Handle<reco::PFJetCollection>       jets; 
    Handle<std::vector<pat::Jet> >      patjets;
@@ -200,11 +224,12 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent, const edm::EventSetup&
    Handle<EcalRecHitCollection>        recHitsEB ;
    Handle<EcalRecHitCollection>        recHitsEE ;
    Handle<reco::TrackCollection>       tracks; 
+   Handle<reco::PFCandidateCollection>           pfCand ;
 
    iEvent.getByLabel( trigSource,     triggers );
    iEvent.getByLabel( pvSource,       recVtxs  );
    iEvent.getByLabel( photonSource,   photons  );
-   iEvent.getByLabel( electronSource, electrons);
+   //iEvent.getByLabel( electronSource, electrons);
    iEvent.getByLabel( muonSource,     muons );
    iEvent.getByLabel( jetSource,      jets  );
    iEvent.getByLabel( patJetSource,   patjets);
@@ -213,7 +238,8 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent, const edm::EventSetup&
    iEvent.getByLabel( EERecHitCollection,     recHitsEE );
    iEvent.getByLabel("BeamHaloSummary", beamHaloSummary) ;
    iEvent.getByLabel( trackSource,    tracks  );
-
+   iEvent.getByLabel( "particleFlow", pfCand ) ;
+   
 
    bool passEvent = true ;
 
@@ -236,6 +262,11 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent, const edm::EventSetup&
    PhotonSelection( photons, recHitsEB, recHitsEE, tracks, selectedPhotons ) ;
    if ( selectedPhotons.size() < (size_t)photonCuts[6] )  passEvent = false ;
    if ( passEvent )   counter[3]++ ;  
+   // Stupid PFIso 
+   if ( passEvent ) { 
+      reco::VertexRef vtxRef(recVtxs, 0);
+      PhotonPFIso( selectedPhotons, &(*pfCand), vtxRef, recVtxs ) ;
+   }
 
    if( beamHaloSummary.isValid() ) {
      const reco::BeamHaloSummary TheSummary = (*beamHaloSummary.product() ); 
@@ -576,9 +607,12 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
        if ( it->pt() < photonCuts[0] || fabs( it->eta() ) > photonCuts[1] ) continue ;
        //float hcalIsoRatio = it->hcalTowerSumEtConeDR04() / it->pt() ;
        //if  ( ( hcalIsoRatio + it->hadronicOverEm() )*it->energy() >= 6.0 ) continue ;
-       // pixel veto
-       if ( it->hasPixelSeed() ) continue ;
- 
+      
+       // pixel veto - replaced by Conversion Veto
+       //if ( it->hasPixelSeed() ) continue ;
+       //if ( ConversionVeto( &(*it) ) ) cout<<" Got Conversion Case !! " << endl ; 
+       if ( ConversionVeto( &(*it) ) ) continue; 
+
        // S_Minor Cuts from the seed cluster
        reco::CaloClusterPtr SCseed = it->superCluster()->seed() ;
        const EcalRecHitCollection* rechits = ( it->isEB()) ? recHitsEB.product() : recHitsEE.product() ;
@@ -604,10 +638,16 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
        float hcalSumEt = it->hcalTowerSumEtConeDR04();
        float trkSumPt  = it->trkSumPtSolidConeDR04();  
 
-       bool trkIso  = ( ( trkSumPt / it->pt())     < photonIso[0] ) ; 
-       bool ecalIso = ( (ecalSumEt / it->energy()) < photonIso[2] && ecalSumEt < photonIso[1] ) ; 
-       bool hcalIso = ( (hcalSumEt / it->energy()) < photonIso[4] && hcalSumEt < photonIso[3] ) ; 
-       if ( !trkIso || !ecalIso || !hcalIso ) continue ;
+       //bool trkIso  = ( ( trkSumPt / it->pt())     < photonIso[0] ) ; 
+       //bool ecalIso = ( (ecalSumEt / it->energy()) < photonIso[2] && ecalSumEt < photonIso[1] ) ; 
+       //bool hcalIso = ( (hcalSumEt / it->energy()) < photonIso[4] && hcalSumEt < photonIso[3] ) ; 
+       //if ( !trkIso || !ecalIso || !hcalIso ) continue ;
+
+       // PF Isolation - still not working , useless
+       //float cHadIso = max( it->chargedHadronIso() - RhoCorrection( 1, it->eta() ), 0. );
+       //float nHadIso = max( it->neutralHadronIso() - RhoCorrection( 2, it->eta() ), 0. );
+       //float photIso = max( it->photonIso()        - RhoCorrection( 3, it->eta() ), 0. );
+       //printf(" cHad: %.3f, nHad: %.3f, phot: %.3f \n", it->chargedHadronIso(),  it->neutralHadronIso(),  it->photonIso() ) ;
 
        // Track Veto 
        int nTrk = 0 ;
@@ -663,10 +703,17 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
        leaves.phoPy[k] = it->p4().Py() ;
        leaves.phoPz[k] = it->p4().Pz() ;
        leaves.phoE[k]  = it->p4().E() ;
-       leaves.phoHoverE[k]  = it->hadronicOverEm() ;
+       //leaves.phoHoverE[k]  = it->hadronicOverEm() ;
+       leaves.phoHoverE[k]  = it->hadTowOverEm() ;
+
        leaves.phoEcalIso[k] = ecalSumEt ;
        leaves.phoHcalIso[k] = hcalSumEt ;
        leaves.phoTrkIso[k]  = trkSumPt ;
+       // the PFIso values need to be filled by PhotonPFIso function
+       //leaves.cHadIso[k]    = cHadIso ;
+       //leaves.nHadIso[k]    = nHadIso ;
+       //leaves.photIso[k]    = photIso ;
+
        leaves.dR_TrkPho[k]  = minDR ;
        leaves.pt_TrkPho[k]  = trkPt ;
        leaves.sMinPho[k]    = sMin ;
@@ -678,7 +725,6 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
        leaves.aveTimeErr[k]   = phoTmp.dt ;
        leaves.sigmaEta[k]     = it->sigmaEtaEta() ;
        leaves.sigmaIeta[k]    = it->sigmaIetaIeta() ;
-   
        selectedPhotons.push_back( &(*it) ) ;
        k++ ;
    }
@@ -1462,6 +1508,59 @@ bool DPAnalysis::GammaJetVeto( vector<const reco::Photon*>& selectedPhotons, vec
      return isGammaJets ;
 }
 
+// return true if it's a conversion case
+bool DPAnalysis::ConversionVeto( const reco::Photon* thePhoton  ) {
+
+   bool passVeto = ConversionTools::hasMatchedPromptElectron( thePhoton->superCluster(), electrons, hConversions, beamspot->position() );
+   return passVeto ;
+}
+
+// type : 1: chargedHadron 2:neutralHadron 3:Photon
+double DPAnalysis::RhoCorrection( int type , double eta ) {
+
+     double EA = 0 ;
+     if ( type == 1 ) {
+        if (                      fabs(eta) < 1.0   ) EA = 0.012 ;
+        if ( fabs(eta) > 1.0   && fabs(eta) < 1.479 ) EA = 0.010 ;
+        if ( fabs(eta) > 1.479 && fabs(eta) < 2.0   ) EA = 0.014 ;
+        if ( fabs(eta) > 2.0   && fabs(eta) < 2.2   ) EA = 0.012 ;
+        if ( fabs(eta) > 2.2   && fabs(eta) < 2.3   ) EA = 0.016 ;
+        if ( fabs(eta) > 2.3   && fabs(eta) < 2.4   ) EA = 0.020 ;
+        if ( fabs(eta) > 2.4                        ) EA = 0.012 ;
+     }
+     if ( type == 2 ) {
+        if (                      fabs(eta) < 1.0   ) EA = 0.030 ;
+        if ( fabs(eta) > 1.0   && fabs(eta) < 1.479 ) EA = 0.057 ;
+        if ( fabs(eta) > 1.479 && fabs(eta) < 2.0   ) EA = 0.039 ;
+        if ( fabs(eta) > 2.0   && fabs(eta) < 2.2   ) EA = 0.015 ;
+        if ( fabs(eta) > 2.2   && fabs(eta) < 2.3   ) EA = 0.024 ;
+        if ( fabs(eta) > 2.3   && fabs(eta) < 2.4   ) EA = 0.039 ;
+        if ( fabs(eta) > 2.4                        ) EA = 0.072 ;
+     }
+     if ( type == 3 ) {
+        if (                      fabs(eta) < 1.0   ) EA = 0.148 ;
+        if ( fabs(eta) > 1.0   && fabs(eta) < 1.479 ) EA = 0.130 ;
+        if ( fabs(eta) > 1.479 && fabs(eta) < 2.0   ) EA = 0.112 ;
+        if ( fabs(eta) > 2.0   && fabs(eta) < 2.2   ) EA = 0.216 ;
+        if ( fabs(eta) > 2.2   && fabs(eta) < 2.3   ) EA = 0.262 ;
+        if ( fabs(eta) > 2.3   && fabs(eta) < 2.4   ) EA = 0.260 ;
+        if ( fabs(eta) > 2.4                        ) EA = 0.266 ;
+     }
+     return EA*rhoIso ;
+
+}
+
+void DPAnalysis::PhotonPFIso( std::vector<const reco::Photon*> thePhotons, const reco::PFCandidateCollection* pfParticlesColl, reco::VertexRef vtxRef, Handle< reco::VertexCollection > vtxColl ) {
+
+    for ( size_t k=0; k< thePhotons.size(); k++ ) { 
+        isolator.fGetIsolation( thePhotons[k], pfParticlesColl, vtxRef, vtxColl );
+        //cout<<"PF  :  "<<isolator.getIsolationCharged()<<" : "<<isolator.getIsolationPhoton()<<" : "<<isolator.getIsolationNeutral()<<endl;
+        leaves.cHadIso[k] = max( isolator.getIsolationCharged() - RhoCorrection( 1, thePhotons[k]->eta() ), 0.) ;
+	leaves.nHadIso[k] = max( isolator.getIsolationNeutral() - RhoCorrection( 2, thePhotons[k]->eta() ), 0.) ;
+	leaves.photIso[k] = max( isolator.getIsolationPhoton()  - RhoCorrection( 3, thePhotons[k]->eta() ), 0.) ;
+        //printf(" cHad: %.3f, nHad: %.3f, phot: %.3f \n", leaves.cHadIso[k],  leaves.nHadIso[k],  leaves.photIso[k] ) ;
+    }
+}
 
 //define this as a plug-in
 DEFINE_FWK_MODULE(DPAnalysis);

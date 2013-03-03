@@ -45,7 +45,8 @@ process.ana = cms.EDAnalyzer('DPAnalysis',
     trigSource = cms.InputTag("TriggerResults","","HLT"),
     jetSource   = cms.InputTag("ak5PFJets"),
     patJetSource = cms.InputTag("selectedPatJetsPFlow"),
-    metSource   = cms.InputTag("pfMet"),
+    #metSource   = cms.InputTag("pfMet"),
+    metSource   = cms.InputTag("pfType1CorrectedMet"),
     muonSource  = cms.InputTag("muons"),
     trackSource = cms.InputTag("generalTracks"),
     electronSource   = cms.InputTag("gsfElectrons"),
@@ -141,6 +142,9 @@ process.uncleanPhotons = cms.Sequence(
                process.myPhotonIDSequence
                )
 
+# typeI MET correction 
+process.load("JetMETCorrections.Type1MET.pfMETCorrections_cff")
+
 # pat process
 # conditions
 process.load( "Configuration.Geometry.GeometryIdeal_cff" )
@@ -188,6 +192,7 @@ process.p = cms.Path(
                      process.uncleanPhotons *
         #             process.patPF2PATSequence*
                      getattr(process,"patPF2PATSequence"+postfix) *
+                     process.producePFMETCorrections *
                      process.ana
                     )
 

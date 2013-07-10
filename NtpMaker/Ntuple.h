@@ -63,6 +63,9 @@ struct Ntuple
   float metPx;
   float metPy;
   float met;
+  float met0Px;
+  float met0Py;
+  float met0;
   float met_dx1;
   float met_dy1;
   float met_dx2;
@@ -129,6 +132,8 @@ struct Ntuple
 
   float cscRho[MAXPHO];
   float cscdPhi[MAXPHO];
+  float dtdEta[MAXPHO];
+  float dtdPhi[MAXPHO];
 
   // Gen Particle information
   int nGen ; 

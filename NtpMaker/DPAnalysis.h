@@ -87,13 +87,13 @@
 #include <algorithm>
 
 // for CSC Segment
-#include "Geometry/CSCGeometry/interface/CSCGeometry.h"
-#include "Geometry/CSCGeometry/interface/CSCChamber.h"
-#include "DataFormats/CSCRecHit/interface/CSCSegment.h"
 #include "DataFormats/CSCRecHit/interface/CSCSegmentCollection.h"
 #include "Geometry/Records/interface/MuonGeometryRecord.h"
-
 #include "DataFormats/METReco/interface/CSCHaloData.h"
+
+// For DT Segment
+#include "DataFormats/DTRecHit/interface/DTRecSegment4DCollection.h"
+
 
 // TrackingRecHit to replace CSCSegment
 #include "DataFormats/TrackingRecHit/interface/TrackingRecHitFwd.h"
@@ -130,6 +130,9 @@
 
 #include "EGamma/EGammaAnalysisTools/src/PFIsolationEstimator.cc"
 
+// global tracking geometry
+//#include "Geometry/Records/interface/GlobalTrackingGeometryRecord.h"
+//#include "Geometry/CommonDetUnit/interface/GlobalTrackingGeometry.h"
 
 // PU SummeryInfo
 //#include "SimDataFormats/PileupSummaryInfo/interface/PileupSummaryInfo.h" 
@@ -220,6 +223,9 @@ class DPAnalysis : public edm::EDAnalyzer {
 
       bool BeamHaloMatch( edm::Handle<CSCSegmentCollection> cscSeg, vector<const reco::Photon*>& selectedPhotons, const edm::EventSetup& iSetup ) ;
       bool BeamHaloMatch( edm::OwnVector<TrackingRecHit> rhits, vector<const reco::Photon*>& selectedPhotons, const edm::EventSetup& iSetup ) ;
+      bool CosmicRayMatch( edm::Handle<reco::MuonCollection> muons, vector<const reco::Photon*>& selectedPhotons ) ;
+
+      bool CosmicRayMatch( edm::Handle<DTRecSegment4DCollection> dtSeg, vector<const reco::Photon*>& selectedPhotons, const EventSetup& iSetup );
 
       bool ConversionVeto( const reco::Photon* thePhoton ) ;
       double RhoCorrection( int type , double eta ) ;
@@ -250,12 +256,14 @@ class DPAnalysis : public edm::EDAnalyzer {
       edm::InputTag electronSource;
       edm::InputTag photonSource;
       edm::InputTag metSource;
+      edm::InputTag type1metSource;
       edm::InputTag jetSource;
       edm::InputTag patJetSource;
       edm::InputTag trackSource;
 
       edm::InputTag EBRecHitCollection;
       edm::InputTag EERecHitCollection;
+      edm::InputTag DTSegmentTag ;
       edm::InputTag CSCSegmentTag ;
       edm::InputTag cscHaloTag ;
       edm::InputTag staMuons ;
@@ -266,6 +274,8 @@ class DPAnalysis : public edm::EDAnalyzer {
       edm::ESHandle<EcalLaserDbService> laser;
       edm::ESHandle<CaloGeometry> pGeometry ;
       const CaloGeometry * theGeometry ;
+      //edm::ESHandle<GlobalTrackingGeometry> trackingGeometry;
+
 
       // PFIso use
       edm::Handle<double> rho_ ;   
@@ -310,7 +320,6 @@ class DPAnalysis : public edm::EDAnalyzer {
       ///string TriggerName ;
       bool passL1 ;
       bool passHLT ;
-
 
       bool debugT ; 
 };

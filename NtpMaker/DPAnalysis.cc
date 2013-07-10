@@ -21,11 +21,24 @@
 #include "DPAnalysis.h"
 #include "Ntuple.h"
 #include "RecoEgamma/EgammaTools/interface/ConversionTools.h"
+
+#include "Geometry/CSCGeometry/interface/CSCGeometry.h"
+#include "Geometry/CSCGeometry/interface/CSCChamber.h"
+#include "DataFormats/CSCRecHit/interface/CSCSegment.h"
+
+// For DT Segment
+#include "Geometry/DTGeometry/interface/DTChamber.h"
+#include "Geometry/DTGeometry/interface/DTGeometry.h"
+
 // For PFIsolation
 #include "DataFormats/RecoCandidate/interface/IsoDepositDirection.h"
 #include "DataFormats/RecoCandidate/interface/IsoDeposit.h"
 #include "DataFormats/RecoCandidate/interface/IsoDepositVetos.h"
 #include "DataFormats/PatCandidates/interface/Isolation.h"
+
+// global tracking geometry
+//#include "Geometry/Records/interface/GlobalTrackingGeometryRecord.h"
+//#include "Geometry/CommonDetUnit/interface/GlobalTrackingGeometry.h"
 
 using namespace cms ;
 using namespace edm ;
@@ -47,12 +60,14 @@ DPAnalysis::DPAnalysis(const edm::ParameterSet& iConfig){
    electronSource       = iConfig.getParameter<edm::InputTag> ("electronSource");
    photonSource         = iConfig.getParameter<edm::InputTag> ("photonSource");
    metSource            = iConfig.getParameter<edm::InputTag> ("metSource");
+   type1metSource       = iConfig.getParameter<edm::InputTag> ("type1metSource");
    jetSource            = iConfig.getParameter<edm::InputTag> ("jetSource");
    patJetSource         = iConfig.getParameter<edm::InputTag> ("patJetSource");
    trackSource          = iConfig.getParameter<edm::InputTag> ("trackSource");
 
    EBRecHitCollection   = iConfig.getParameter<edm::InputTag> ("EBRecHitCollection") ;
    EERecHitCollection   = iConfig.getParameter<edm::InputTag> ("EERecHitCollection") ;
+   DTSegmentTag         = iConfig.getParameter<edm::InputTag> ("DTSegmentCollection") ;
    CSCSegmentTag        = iConfig.getParameter<edm::InputTag> ("CSCSegmentCollection") ;
    cscHaloTag           = iConfig.getParameter<edm::InputTag> ("cscHaloData");
    staMuons             = iConfig.getParameter<edm::InputTag> ("staMuons");
@@ -99,7 +114,7 @@ DPAnalysis::DPAnalysis(const edm::ParameterSet& iConfig){
 
    // shitty PF isolation
    isolator.initializePhotonIsolation(kTRUE);
-   isolator. setConeSize(0.3);
+   isolator.setConeSize(0.3);
 
 }
 
@@ -137,7 +152,7 @@ void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
    theGeometry = pGeometry.product() ;
    // event time
    eventTime = iEvent.time() ;
-
+   // Initialize ntuple branches
    initializeBranches( theTree, leaves );
 
    leaves.bx          = iEvent.bunchCrossing();
@@ -147,7 +162,7 @@ void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
    leaves.eventId     = iEvent.id ().event () ;
 
    /* 
-   Handle<std::vector< PileupSummaryInfo > >  PupInfo;
+   Handle<std::vector< PileupSummaryInfo > >  PileUpInfo;
    iEvent.getByLabel(pileupSource, PupInfo);
    for( std::vector<PileupSummaryInfo>::const_iterator PVI = PupInfo->begin(); PVI != PupInfo->end(); ++PVI) {
        std::cout << " Pileup Information: bunchXing, nvtx: " << PVI->getBunchCrossing() << " " << PVI->getPU_NumInteractions() << std::endl;
@@ -176,6 +191,10 @@ void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
    if (counter[0] == 0 )  PrintTriggers( iEvent ) ;
 
    int run_id    = iEvent.id().run()  ;
+
+   // Global Tracking Geometry
+   //ESHandle<GlobalTrackingGeometry> trackingGeometry;
+   //iSetup.get<GlobalTrackingGeometryRecord>().get(trackingGeometry);
 
    counter[0]++ ;  
    // L1 Trigger Selection
@@ -208,6 +227,7 @@ void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
    // fill the ntuple
    if ( pass && !isData ) theTree->Fill();
    if ( pass && isData && passTrigger ) theTree->Fill();
+   delete jecUnc ;  
 }
 
 bool DPAnalysis::EventSelection(const edm::Event& iEvent, const edm::EventSetup& iSetup ) {
@@ -220,6 +240,7 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent, const edm::EventSetup&
    Handle<reco::MuonCollection>        muons; 
    Handle<reco::PFJetCollection>       jets; 
    Handle<std::vector<pat::Jet> >      patjets;
+   Handle<reco::PFMETCollection>       met0; 
    Handle<reco::PFMETCollection>       met; 
    Handle<EcalRecHitCollection>        recHitsEB ;
    Handle<EcalRecHitCollection>        recHitsEE ;
@@ -233,7 +254,8 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent, const edm::EventSetup&
    iEvent.getByLabel( muonSource,     muons );
    iEvent.getByLabel( jetSource,      jets  );
    iEvent.getByLabel( patJetSource,   patjets);
-   iEvent.getByLabel( metSource,      met  );
+   iEvent.getByLabel( metSource,      met0  );
+   iEvent.getByLabel( type1metSource, met  );
    iEvent.getByLabel( EBRecHitCollection,     recHitsEB );
    iEvent.getByLabel( EERecHitCollection,     recHitsEE );
    iEvent.getByLabel("BeamHaloSummary", beamHaloSummary) ;
@@ -285,6 +307,11 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent, const edm::EventSetup&
    iEvent.getByLabel( CSCSegmentTag,  cscSegments );
    BeamHaloMatch( cscSegments, selectedPhotons, iSetup ) ;
    
+   Handle<DTRecSegment4DCollection>   dtSegments ;
+   iEvent.getByLabel( DTSegmentTag,   dtSegments );
+   //CosmicRayMatch( dtSegments, selectedPhotons, iSetup ) ;
+   CosmicRayMatch( muons, selectedPhotons ) ;
+   
    //Handle< edm::OwnVector<TrackingRecHit> >  mu_rhits ;
    //iEvent.getByLabel( staMuons,  mu_rhits );
    //bool haloMuon = BeamHaloMatch( *(mu_rhits.product()), selectedPhotons, iSetup ) ;
@@ -308,13 +335,18 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent, const edm::EventSetup&
    MuonSelection( muons, selectedMuons );
 
    //HLTMET( jets, selectedMuons );   
+   const reco::PFMET pfMet0 = (*met0)[0] ;
+   leaves.met0   = pfMet0.et() ;
+   leaves.met0Px = pfMet0.px() ;
+   leaves.met0Py = pfMet0.py() ;
 
    const reco::PFMET pfMet = (*met)[0] ;
    leaves.met   = pfMet.et() ;
    leaves.metPx = pfMet.px() ;
    leaves.metPy = pfMet.py() ;
+
    if ( pfMet.pt() < metCuts[0]  ) passEvent = false;
-   if ( passEvent )   counter[6]++ ;  
+   if ( passEvent )  counter[6]++ ;  
 
    return passEvent ;
 }
@@ -407,8 +439,8 @@ void DPAnalysis::TriggerTagging( Handle<edm::TriggerResults> triggers, const edm
           for ( size_t j=0; j< triggerPatent.size(); j++ )  {
               if ( strncmp( tName.c_str(), triggerPatent[j].c_str(), triggerPatent[j].size() ) ==0 ) {
                   firedTrig[j] = i;
-                  cout<<" Trigger Found ("<<j <<"):  "<<tName ;
-                  cout<<" Idx: "<< i <<" triggers "<<endl;
+                  //cout<<" Trigger Found ("<<j <<"):  "<<tName ;
+                  //cout<<" Idx: "<< i <<" triggers "<<endl;
               }
           }
       }
@@ -585,6 +617,32 @@ bool DPAnalysis::VertexSelection( Handle<reco::VertexCollection> vtx ) {
      if ( thisVertex < 1 )   hasGoodVertex = false ;
      return hasGoodVertex ;
 }
+
+/*
+bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle<EcalRecHitCollection> recHitsEB, Handle<EcalRecHitCollection> recHitsEE, Handle<reco::TrackCollection> tracks ) {
+
+   int cuts[5]= {0} ;
+   double maxPt = 0 ;
+   for(reco::PhotonCollection::const_iterator it = photons->begin(); it != photons->end(); it++) {
+
+       if ( ConversionVeto( &(*it) ) ) continue; 
+       if ( it->pt() > photonCuts[0] )          cuts[0]++  ;
+       if ( fabs( it->eta() ) > photonCuts[1] ) cuts[1]++  ;
+
+       // S_Minor Cuts from the seed cluster
+       reco::CaloClusterPtr SCseed = it->superCluster()->seed() ;
+       const EcalRecHitCollection* rechits = ( it->isEB()) ? recHitsEB.product() : recHitsEE.product() ;
+
+       Cluster2ndMoments moments = EcalClusterTools::cluster2ndMoments(*SCseed, *rechits);
+       float sMin =  moments.sMin  ;
+       if ( sMin >= photonCuts[3] || sMin <= photonCuts[4] ) cuts[2]++ ;
+
+       // check leading photon pt  
+       maxPt = ( it->pt() > maxPt ) ? it->pt() : maxPt ;
+   }
+
+}
+*/
 
 bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle<EcalRecHitCollection> recHitsEB, Handle<EcalRecHitCollection> recHitsEE, Handle<reco::TrackCollection> tracks, vector<const reco::Photon*>& selectedPhotons ) {
 
@@ -781,6 +839,171 @@ bool DPAnalysis::BeamHaloMatch( OwnVector<TrackingRecHit> rhits, vector<const re
 
 }
 
+// Use cosmic muon 
+/*
+bool DPAnalysis::CosmicRayMatch( Handle<reco::MuonCollection> muons, vector<const reco::Photon*>& selectedPhotons ) 
+{
+
+   for ( size_t i=0; i< selectedPhotons.size() ; i++ ) 
+   {
+
+       double dPhi = 99. ;
+       double dEta = 99. ;
+       double dR   = 99. ;
+       int nMu = 0 ;
+       LorentzVector gP4 = selectedPhotons[i]->p4() ;
+       printf("** Photon pos:[ %f, %f, %f, %f ] \n", gP4.x(), gP4.y(), gP4.z(), gP4.rho() ) ;
+       for (reco::MuonCollection::const_iterator it = muons->begin(); it != muons->end(); it++) 
+       {
+           TrackRef inTrkRef = it->innerTrack() ;
+	   const std::vector<reco::Track>* inTrk = inTrkRef.product();
+           if ( inTrk != NULL ) 
+           {
+              const math::XYZPoint iPos = (*inTrk)[0].outerPosition() ; 
+              printf(" inner pos:( %f, %f, %f, %f ) \n", iPos.x() , iPos.y() , iPos.z(), iPos.rho()  ) ;
+           }
+
+           TrackRef outTrkRef = it->outerTrack() ;
+	   const std::vector<reco::Track>* outTrk = outTrkRef.product();
+           if ( outTrk != NULL ) 
+           {
+              const math::XYZPoint oPos = (*outTrk)[0].innerPosition() ; 
+              printf(" outer pos:( %f, %f, %f, %f ) \n", oPos.x() , oPos.y() , oPos.z(), oPos.rho()  ) ;
+           }
+       }
+
+   }
+
+   return true ;
+}
+*/
+bool DPAnalysis::CosmicRayMatch( Handle<reco::MuonCollection> muons, vector<const reco::Photon*>& selectedPhotons ) 
+{
+
+   //cout<<" --------------- "<<endl ;
+   for ( size_t i=0; i< selectedPhotons.size() ; i++ ) 
+   {
+
+       double dPhi = 99. ;
+       double dEta = 99. ;
+       double dR   = 99. ;
+       int nMu = 0 ;
+       for (reco::MuonCollection::const_iterator it = muons->begin(); it != muons->end(); it++) 
+       {
+           nMu++ ;
+           
+	   //cout<<" =========== Cosmic Muon ===== "<< nMu  ;
+           //if (  it->isCaloCompatibilityValid() ) cout<<" , CaloCaloCompatibility is valid -> " << it->caloCompatibility() << endl ;
+           // Associated Track is only availabe for RECO ( information from TrackExtra ) , AOD can't use it !
+           /*
+           const reco::Track* track = 0;
+	   if ( ! it->track().isNull() ) {
+	        track = it->track().get();
+	   }
+	   else {
+		if ( ! it->standAloneMuon().isNull() ) {
+		   track = it->standAloneMuon().get();
+	        }
+                cout<<" no cosmic track is associated !! "<<endl ; 
+	   }
+           const math::XYZPoint oPos = track->outerPosition() ; 
+           const math::XYZPoint iPos = track->innerPosition() ; 
+	   printf(" outer pos:( %f, %f, %f, %f ) \n", oPos.eta() , oPos.phi() , oPos.z(), oPos.rho()  ) ;
+	   printf(" inner pos:( %f, %f, %f, %f ) \n", iPos.eta() , iPos.phi() , iPos.z(), iPos.rho()  ) ;
+           */
+           /*
+            for ( trackingRecHit_iterator coshit = track->recHitsBegin(); coshit != track->recHitsEnd(); coshit++ ) {
+                DetId id((*coshit)->geographicalId());
+                double hity = trackingGeometry->idToDet(id)->position().y();
+                cout<<" hity : "<< hity <<endl ;
+            }
+           */
+           if ( it->caloCompatibility() < 0.501 ) continue ;
+
+           math::XYZPointF ecalPos = (it->calEnergy()).ecal_position ;
+	   LorentzVector ecalP4( ecalPos.x(), ecalPos.y(), ecalPos.z(), sqrt(ecalPos.Mag2()) ) ;
+           if ( ecalPos.rho() < 0.01 ) continue ;
+
+           //printf(" Ecal pos:( %f, %f, %f, %f ) \n", ecalPos.eta() , ecalPos.phi() , ecalPos.z(), ecalPos.rho()  ) ;
+	   //printf(" muon calo :( %f, %f, %f, %f ) \n", ecalP4.eta() , ecalP4.phi() , ecalP4.z(), ecalP4.rho()  ) ;
+	   //printf(" Muon RECO :( %f, %f ) \n", it->eta() ,    it->phi()  ) ;
+           double dEta_ = fabs( ecalP4.eta() - selectedPhotons[i]->eta() ) ;
+           double dPhi_ = ROOT::Math::VectorUtil::DeltaPhi( ecalP4, selectedPhotons[i]->p4() ) ;
+           double dR_ = sqrt( (dEta_*dEta_) + (dPhi_*dPhi_) ) ;
+           //printf("mu(%d)  dR: %.3f \n", nMu, dR_ );
+           if ( dR_ < dR ) {
+               dR = dR_ ;
+               dPhi = fabs( dPhi_ ) ;
+               dEta = dEta_ ;
+           }
+           
+       }
+       leaves.dtdEta[i]  = dEta ;
+       leaves.dtdPhi[i]  = dPhi ;
+
+   }
+
+   return true ;
+}
+
+// !!! Only work for RECO - dtSegment is not available for AOD 
+bool DPAnalysis::CosmicRayMatch( Handle<DTRecSegment4DCollection> dtSeg, vector<const reco::Photon*>& selectedPhotons, const EventSetup& iSetup ) {
+
+   ESHandle<DTGeometry> dtGeom;
+   iSetup.get<MuonGeometryRecord>().get(dtGeom);
+
+   //bool cosmicmatch = false ;
+   for ( size_t i=0; i< selectedPhotons.size() ; i++ ) {
+
+       double dPhi = 99. ;
+       double dEta = 99. ;
+       double dR   = 99. ;
+       for (DTRecSegment4DCollection::const_iterator it = dtSeg->begin(); it != dtSeg->end(); it++) {
+           if ( !it->isValid()) continue ;
+
+           // Get the corresponding DTChamber
+           DetId id = it->geographicalId();
+           DTChamberId chamberId(id.rawId());
+           if ( chamberId.station() > 1 ) continue ;  // only look at segment from inner most chambers
+           const DTChamber* dtchamber = dtGeom->chamber( chamberId ) ;
+
+           // Get segment position in DT
+	   GlobalPoint  gp = dtchamber->toGlobal( it->localPosition()  );
+           //double gpMag = sqrt( (gp.x()*gp.x()) + (gp.y()*gp.y()) + (gp.z()*gp.z()) ) ;
+	   //LorentzVector segP4( gp.x(), gp.y(), gp.z(), gpMag ) ;
+
+           // Get segment direction in DT
+           GlobalVector gv = dtchamber->toGlobal( it->localDirection() ) ;
+           double dx = gp.x() - selectedPhotons[i]->caloPosition().x() ;
+           double dy = gp.y() - selectedPhotons[i]->caloPosition().y() ;
+           double dz = gp.z() - selectedPhotons[i]->caloPosition().z() ;
+           double dr = sqrt( (dx*dx) + (dy*dy) + (dz*dz) ) ;
+           //printf(" dir( %f, %f, %f, %f ) \n ", gv.x() , gv.y(), gv.z() , gv.mag() ) ;
+
+           // Project segment position to Ecal 
+           double projX =  gp.x() - ( dr* gv.x() / gv.mag()) ;
+           double projY =  gp.y() - ( dr* gv.y() / gv.mag()) ;
+           double projZ =  gp.z() - ( dr* gv.z() / gv.mag()) ;
+           double projR = sqrt( (projX*projX) + (projY*projY) + (projZ*projZ) ) ;
+
+           LorentzVector segEBP4( projX, projY, projZ, projR ) ;
+
+           double dR_   = ROOT::Math::VectorUtil::DeltaR( segEBP4, selectedPhotons[i]->p4() ) ;
+           double dPhi_ = ROOT::Math::VectorUtil::DeltaPhi( segEBP4, selectedPhotons[i]->p4() ) ;
+           double dEta_ = fabs( segEBP4.Eta() - selectedPhotons[i]->p4().Eta() ) ;
+           
+           if ( dR_ < dR ) {
+               dR = dR_ ;
+               dPhi = fabs( dPhi_ ) ;
+               dEta = dEta_ ;
+           }
+       }
+       leaves.dtdEta[i]  = dEta ;
+       leaves.dtdPhi[i]  = dPhi ;
+  }
+  return true ;
+
+}
 
 // !!! Only work for RECO - cscSegment is not available for AOD 
 bool DPAnalysis::BeamHaloMatch( Handle<CSCSegmentCollection> cscSeg, vector<const reco::Photon*>& selectedPhotons, const EventSetup& iSetup ) {

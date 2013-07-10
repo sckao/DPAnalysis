@@ -1,22 +1,19 @@
 import FWCore.ParameterSet.Config as cms
 
-process = cms.Process("Demo")
+process = cms.Process("test")
 
 process.load("FWCore.MessageService.MessageLogger_cfi")
 
-process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32( 2500 ) )
+process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(2000) )
 
 process.source = cms.Source("PoolSource",
-    # replace 'myfile.root' with the source file you want to use
-    fileNames = cms.untracked.vstring(
 
-      #'dcache:/pnfs/cms/WAX/11/store/data/Run2012B/SinglePhoton/RECO/PromptReco-v1/000/196/681/700E4F1C-A9BB-E111-8B16-001D09F23174.root',
-       'dcache:/pnfs/cms/WAX/11/store/data/Run2012C/SinglePhoton/AOD/PromptReco-v2/000/200/190/1CD40010-5FDF-E111-AAA6-001D09F23F2A.root'
-       #'dcache:/pnfs/cms/WAX/11/store/data/Run2012B/MET/RECO/PromptReco-v1/000/195/552/04EA349F-5DB1-E111-A002-E0CB4E553651.root' 
-       #'dcache:/pnfs/cms/WAX/11/store/data/Run2012B/SingleMu/RECO/PromptReco-v1/000/194/151/020D9700-FE9F-E111-9535-002481E0E56C.root'
-        #'dcache:/pnfs/cms/WAX/11/store/data/Run2011B/Photon/AOD/PromptReco-v1/000/179/558/5886DB5E-A5FF-E011-92AE-BCAEC5364CFB.root'
- 
+    fileNames = cms.untracked.vstring(
+#'file:/mnt/hadoop/store/user/sckao/SinglePhoton/EXO_DisplacedPhoton2ndSKIM/176d86b18a84f276e44dc86f253a35ed/skim_c_247_1_KQl.root'
+'file:/mnt/hadoop/store/data/Run2012D/SinglePhoton/RECO/EXODisplacedPhoton-19Dec2012-v1/10000/A02BEF7A-A365-E211-B2EF-001E67397B25.root'
+#'file:/local/cms/phedex/store/data/Run2012C/SinglePhoton/RECO/EXODisplacedPhoton-PromptSkim-v3/000/200/190/00000/18BB0794-8CDF-E111-B9B0-0025B31E3D3C.root'
     ),
+
     # explicitly drop photons resident in AOD/RECO, to make sure only those locally re-made (uncleaned photons) are used
     inputCommands = cms.untracked.vstring('keep *'
                                           #,'drop  *_photonCore_*_RECO' # drop hfRecoEcalCandidate as remade in this process
@@ -25,26 +22,35 @@ process.source = cms.Source("PoolSource",
 
 )
 
+
+#import EXO.DPAnalysis.skim2012c as fileList
+#process.source.fileNames = fileList.fileNames
+
 process.options   = cms.untracked.PSet(
                     wantSummary = cms.untracked.bool(True),  
                     SkipEvent = cms.untracked.vstring('ProductNotFound')
 )   
 
+process.load("FWCore.MessageService.MessageLogger_cfi")
+process.MessageLogger.cerr.FwkReport.reportEvery = cms.untracked.int32(1000)
 
 process.ana = cms.EDAnalyzer('DPAnalysis',
-    rootFileName     = cms.untracked.string('Photon_2012_test.root'),
-    #rootFileName     = cms.untracked.string('/uscms_data/d2/sckao/Photon_2012B_TrgMatch.root'),
-    #triggerName      = cms.vstring('HLT_IsoMu30_v', 'HLT_DisplacedPhoton65_CaloIdVL_IsoL_PFMET25'),
-    triggerName      = cms.vstring('HLT_Photon50_CaloIdVL_IsoL', 'HLT_DisplacedPhoton65_CaloIdVL_IsoL_PFMET25'),
+    rootFileName     = cms.untracked.string('run2012D.root'),
+    triggerName      = cms.vstring('HLT_Photon50_CaloIdVL_IsoL','HLT_DisplacedPhoton65_CaloIdVL_IsoL_PFMET25'),
     L1GTSource       = cms.string('L1_SingleEG22'),
-    L1Select         = cms.bool( True ),
-    isData           = cms.bool(True),
+    L1Select         = cms.bool( False ),
+    isData           = cms.bool( True ),
     cscHaloData      = cms.InputTag("CSCHaloData"),
     staMuons         = cms.InputTag("standAloneMuons"),
+    CSCSegmentCollection = cms.InputTag("cscSegments"),
+    #DTSegmentCollection = cms.InputTag("dtSegments"),
+    DTSegmentCollection = cms.InputTag("dt4DCosmicSegments"),
+    muonSource  = cms.InputTag("muonsFromCosmics"),
     trigSource = cms.InputTag("TriggerResults","","HLT"),
     jetSource   = cms.InputTag("ak5PFJets"),
+    patJetSource = cms.InputTag("selectedPatJetsPFlow"),
     metSource   = cms.InputTag("pfMet"),
-    muonSource  = cms.InputTag("muons"),
+    type1metSource   = cms.InputTag("pfType1CorrectedMet"),
     trackSource = cms.InputTag("generalTracks"),
     electronSource   = cms.InputTag("gsfElectrons"),
     photonSource     = cms.InputTag("myphotons"),
@@ -52,20 +58,19 @@ process.ana = cms.EDAnalyzer('DPAnalysis',
     beamSpotSource   = cms.InputTag("offlineBeamSpot"),
     EBRecHitCollection = cms.InputTag("reducedEcalRecHitsEB"),
     EERecHitCollection = cms.InputTag("reducedEcalRecHitsEE"),
-    CSCSegmentCollection = cms.InputTag("cscSegments"),
     tau                = cms.double( 1000 ), 
     genParticles = cms.InputTag("genParticles"),
 
     # Set up cuts for physics objects
     # vertex cuts                z   ndof   d0 
     vtxCuts       = cms.vdouble( 99,    0,  99 ),
-    # photon cuts                pt   eta  sMajMax,  sMinMin, sMinMax, trkVeto  Num  leadingPt 
-    photonCuts    = cms.vdouble( 45,  2.4,    999.,      -1,     99.,    0.05,   1 ,     80   ),
-    # photon isolation           trk,  ecalSumEt, ecalR, hcalSumEt, hcalR 
-    photonIso     = cms.vdouble(  0.2,       4.5,   0.1,       4.0,   0.1 ),
+    # photon cuts                pt   eta  sMajMax,  sMinMin, sMinMax,   dR,  Num  leadingPt  
+    photonCuts    = cms.vdouble( 45,  2.4,     99.,      -1.,     99.,   0.0,  1,    45  ),
+    # photon isolation           trkR,  ecalSumEt, ecalR, hcalSumEt, hcalR 
+    photonIso     = cms.vdouble(  1.,       5.0,   1.,       5.0,   1. ),
     # jet cuts                   pt    eta    dR,  nJets
-    jetCuts       = cms.vdouble( 35. , 2.4,  0.3,    0 ),
-    metCuts       = cms.vdouble(  0. ),
+    jetCuts       = cms.vdouble( 30. , 2.4,  0.3,    0 ),
+    metCuts       = cms.vdouble( 0. ),
     # electron cuts              pt  eta  EBIso  EEIso nLostHit  
     electronCuts  = cms.vdouble( 25, 2.4,  0.15,   0.1,      2 ),
     # muon cuts                  pt  eta  Iso  dR   
@@ -77,13 +82,14 @@ process.ana = cms.EDAnalyzer('DPAnalysis',
 # Global Tag
 process.load("Configuration.StandardSequences.FrontierConditions_GlobalTag_cff")
 #process.load("Configuration.StandardSequences.FrontierConditions_GlobalTag_noesprefer_cff")
-#process.GlobalTag.globaltag = 'GR_P_V35::All'
-process.GlobalTag.globaltag = 'GR_P_V40::All'
+#process.GlobalTag.globaltag = 'GR_R_53_V18::All'
+from Configuration.AlCa.GlobalTag import GlobalTag
+process.GlobalTag = GlobalTag( process.GlobalTag, 'GR_R_53_V18::All' )
+
 
 # to get clustering 
-#process.load("Configuration.StandardSequences.Geometry_cff")
-process.load('Configuration.Geometry.GeometryAll_cff')
-process.load('Configuration.StandardSequences.GeometryExtended_cff')
+process.load("Configuration.StandardSequences.Geometry_cff")
+process.load('Configuration/StandardSequences/GeometryExtended_cff')
 
 # Geometry
 process.load("Geometry.CaloEventSetup.CaloTopology_cfi")
@@ -102,7 +108,6 @@ process.uncleanSCRecovered.cleanScCollection=cms.InputTag ("correctedHybridSuper
 # myPhoton sequence
 process.load("RecoEgamma.PhotonIdentification.photonId_cff")
 process.load("RecoLocalCalo.EcalRecAlgos.EcalSeverityLevelESProducer_cfi")
-#process.ecalSeverityLevel.timeThresh = cms.double(2.0)
 
 import RecoEgamma.EgammaPhotonProducers.photonCore_cfi
 import RecoEgamma.EgammaPhotonProducers.photons_cfi
@@ -111,7 +116,7 @@ process.myphotonCores=RecoEgamma.EgammaPhotonProducers.photonCore_cfi.photonCore
 process.myphotonCores.scHybridBarrelProducer=cms.InputTag ("uncleanSCRecovered:uncleanHybridSuperClusters")
 
 from RecoEgamma.PhotonIdentification.mipVariable_cfi import *
-newMipVariable = mipVariable.clone()  
+newMipVariable = mipVariable.clone()
 newMipVariable.barrelEcalRecHitCollection = cms.InputTag('reducedEcalRecHitsEB')
 newMipVariable.endcapEcalRecHitCollection = cms.InputTag('reducedEcalRecHitsEE')
 
@@ -140,9 +145,79 @@ process.uncleanPhotons = cms.Sequence(
                process.myPhotonIDSequence
                )
 
+# PFIso 
+#from CommonTools.ParticleFlow.Tools.pfIsolation import setupPFElectronIso, setupPFPhotonIso
+#process.phoIsoSequence = setupPFPhotonIso(process, 'photons')
+
+# typeI MET correction 
+process.load("JetMETCorrections.Type1MET.pfMETCorrections_cff")
+
+# pat process
+
+# conditions
+process.load( "Configuration.Geometry.GeometryIdeal_cff" )
+process.load( "Configuration.StandardSequences.MagneticField_AutoFromDBCurrent_cff" )
+
+# load the PAT config
+process.load("PhysicsTools.PatAlgos.patSequences_cff")
+
+process.patElectrons.addGenMatch  = False
+process.patJets.addGenPartonMatch = False
+process.patJets.addGenJetMatch    = False
+process.patMETs.addGenMET         = False
+process.patMuons.addGenMatch      = False
+process.patPhotons.addGenMatch    = False
+process.patTaus.addGenMatch       = False
+process.patTaus.addGenJetMatch    = False
+process.patJetCorrFactors.levels.append( 'L2L3Residual' )
+
+process.out = cms.OutputModule("PoolOutputModule" ,
+                fileName = cms.untracked.string( 'patTuple_data.root' ) ,
+		outputCommands = cms.untracked.vstring(
+			'keep *'
+			#               'keep *_cscSegments_*_*'
+			#               *patEventContentNoCleaning
+			)
+																                 )
+
+
+# this function will modify the PAT sequences.
+from PhysicsTools.PatAlgos.tools.pfTools import *
+
+postfix = "PFlow"
+
+usePF2PAT( process
+		, runPF2PAT = True
+		, jetAlgo   = 'AK5'
+		, runOnMC   = False
+		, postfix   = postfix
+		# for MC
+		#, jetCorrections=('AK5PFchs', ['L1FastJet','L2Relative','L3Absolute'])
+		# for data
+		, jetCorrections=('AK5PFchs', ['L2L3Residual'])
+	 )
+
+
+
 process.p = cms.Path(
                      process.uncleanPhotons*
+		     getattr(process,"patPF2PATSequence"+postfix)*
+                     process.producePFMETCorrections *
                      process.ana
                     )
 
+# top projections in PF2PAT:
+getattr(process,"pfNoPileUp"+postfix).enable = True
+getattr(process,"pfNoMuon"+postfix).enable = True
+getattr(process,"pfNoElectron"+postfix).enable = True
+getattr(process,"pfNoTau"+postfix).enable = False
+getattr(process,"pfNoJet"+postfix).enable = True
+
+# verbose flags for the PF2PAT modules
+getattr(process,"pfNoMuon"+postfix).verbose = False
+
+# enable delta beta correction for muon selection in PF2PAT?
+getattr(process,"pfIsolatedMuons"+postfix).doDeltaBetaCorrection = False
+
+process.out.outputCommands.extend( [ 'drop *_*_*_*' ] )
 

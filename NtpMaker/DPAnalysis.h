@@ -100,17 +100,17 @@
 #include "DataFormats/Common/interface/OwnVector.h"
 
 // Calibration services
-#include "Geometry/CaloGeometry/interface/CaloGeometry.h"
-#include "Geometry/Records/interface/CaloGeometryRecord.h"
+//#include "Geometry/CaloGeometry/interface/CaloGeometry.h"
+//#include "Geometry/Records/interface/CaloGeometryRecord.h"
 
-#include "CondFormats/EcalObjects/interface/EcalIntercalibConstants.h"
-#include "CondFormats/DataRecord/interface/EcalIntercalibConstantsRcd.h"
-#include "CondFormats/EcalObjects/interface/EcalADCToGeVConstant.h"
-#include "CondFormats/DataRecord/interface/EcalADCToGeVConstantRcd.h"
-#include "CalibCalorimetry/EcalLaserCorrection/interface/EcalLaserDbService.h"
-#include "CalibCalorimetry/EcalLaserCorrection/interface/EcalLaserDbRecord.h"
+//#include "CondFormats/EcalObjects/interface/EcalIntercalibConstants.h"
+//#include "CondFormats/DataRecord/interface/EcalIntercalibConstantsRcd.h"
+//#include "CondFormats/EcalObjects/interface/EcalADCToGeVConstant.h"
+//#include "CondFormats/DataRecord/interface/EcalADCToGeVConstantRcd.h"
+//#include "CalibCalorimetry/EcalLaserCorrection/interface/EcalLaserDbService.h"
+//#include "CalibCalorimetry/EcalLaserCorrection/interface/EcalLaserDbRecord.h"
 #include "RecoEcal/EgammaCoreTools/interface/EcalTools.h"
-#include "CalibCalorimetry/EcalTiming/interface/timeVsAmpliCorrector.h"
+//#include "CalibCalorimetry/EcalTiming/interface/timeVsAmpliCorrector.h"
 
 // JEC uncerntainties
 #include "CondFormats/JetMETObjects/interface/JetCorrectorParameters.h"
@@ -128,7 +128,8 @@
 
 #include "RecoEgamma/EgammaTools/interface/ConversionTools.h"
 
-#include "EGamma/EGammaAnalysisTools/src/PFIsolationEstimator.cc"
+//#include "EGamma/EGammaAnalysisTools/src/PFIsolationEstimator.cc"
+#include "PFIsolationEstimator.h"
 
 // global tracking geometry
 //#include "Geometry/Records/interface/GlobalTrackingGeometryRecord.h"
@@ -269,9 +270,9 @@ class DPAnalysis : public edm::EDAnalyzer {
       edm::InputTag staMuons ;
 
       //edm::InputTag pileupSource ;
-      edm::ESHandle<EcalIntercalibConstants> ical;
-      edm::ESHandle<EcalADCToGeVConstant> agc;
-      edm::ESHandle<EcalLaserDbService> laser;
+      //edm::ESHandle<EcalIntercalibConstants> ical;
+      //edm::ESHandle<EcalADCToGeVConstant> agc;
+      //edm::ESHandle<EcalLaserDbService> laser;
       edm::ESHandle<CaloGeometry> pGeometry ;
       const CaloGeometry * theGeometry ;
       //edm::ESHandle<GlobalTrackingGeometry> trackingGeometry;
@@ -311,7 +312,7 @@ class DPAnalysis : public edm::EDAnalyzer {
       float sMin_ ;
       int runID_ ;
 
-      timeCorrector theTimeCorrector_;
+//      timeCorrector theTimeCorrector_;
       edm::Timestamp eventTime ;
 
       std::vector<int> firedTrig ;

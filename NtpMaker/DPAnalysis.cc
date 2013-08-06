@@ -104,8 +104,8 @@ DPAnalysis::DPAnalysis(const edm::ParameterSet& iConfig){
    for ( int i=0; i< 10 ; i++) counter[i] = 0 ;
 
    // initialize the time corrector
-   theTimeCorrector_.initEB("EB");
-   theTimeCorrector_.initEE("EElow");
+   //theTimeCorrector_.initEB("EB");
+   //theTimeCorrector_.initEE("EElow");
    runID_ = 0 ;
 
    debugT = false ;
@@ -142,14 +142,14 @@ void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
 
    // get calibration service
    // IC's
-   iSetup.get<EcalIntercalibConstantsRcd>().get(ical);
+   //iSetup.get<EcalIntercalibConstantsRcd>().get(ical);
    // ADCtoGeV
-   iSetup.get<EcalADCToGeVConstantRcd>().get(agc);
+   //iSetup.get<EcalADCToGeVConstantRcd>().get(agc);
    // transp corrections
-   iSetup.get<EcalLaserDbRecord>().get(laser);
+   //iSetup.get<EcalLaserDbRecord>().get(laser);
    // Geometry
-   iSetup.get<CaloGeometryRecord> ().get (pGeometry) ;
-   theGeometry = pGeometry.product() ;
+   //iSetup.get<CaloGeometryRecord> ().get (pGeometry) ;
+   //theGeometry = pGeometry.product() ;
    // event time
    eventTime = iEvent.time() ;
    // Initialize ntuple branches
@@ -215,7 +215,7 @@ void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
 
    // get the generator information
    if ( !isData && tau > -0.1 ) { 
-      gen->GetGenEvent( iEvent, leaves );
+      gen->GetGenEvent( iEvent, leaves, true );
       //gen->GetGen( iEvent, leaves );
    }
    //if ( !isData ) gen->PrintGenEvent( iEvent );
@@ -1047,9 +1047,6 @@ bool DPAnalysis::BeamHaloMatch( Handle<CSCSegmentCollection> cscSeg, vector<cons
 // return time, timeError
 pair<double,double> DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitCollection> recHitsEB, Handle<EcalRecHitCollection> recHitsEE ) {
 
-  const EcalIntercalibConstantMap& icalMap = ical->getMap();
-  float adcToGeV = float(agc->getEBValue());
-
   double xtime = 0 ;
   double xtimeErr = 0 ;
 
@@ -1086,39 +1083,10 @@ pair<double,double> DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle
              if ( !( myhit.checkFlag(EcalRecHit::kGood) || myhit.checkFlag(EcalRecHit::kOutOfTime) || 
                     myhit.checkFlag(EcalRecHit::kPoorCalib)  ) )  continue;
 
-             // swiss cross cleaning 
-             //float swissX = (isEB) ? EcalTools::swissCross(detitr->first, *recHitsEB , 0., true ) : 
-             //                        EcalTools::swissCross(detitr->first, *recHitsEE , 0., true ) ;
-
-             //if ( swissX > 0.95 ) { 
-             //if ( myhit.checkFlag(EcalRecHit::kWeird) || myhit.checkFlag(EcalRecHit::kDiWeird) ) {
-                //cout<<" swissX = "<< swissX <<" @ "<< nXtl <<endl ;
-                //continue ;
-             //}
              nXtl++ ;
-
-             // thisamp is the EB amplitude of the current rechit
-	     double thisamp  = myhit.energy () ;
-	   
-	     EcalIntercalibConstantMap::const_iterator icalit = icalMap.find(detitr->first);
-	     EcalIntercalibConstant icalconst = 1;
-	     if( icalit!=icalMap.end() ) {
-	       icalconst = (*icalit);
-	     } else {
-	       edm::LogError("EcalTimePhyTreeMaker") << "No intercalib const found for xtal " << (detitr->first).rawId();
-   	     }
-	   
-	     // get laser coefficient
-	     float lasercalib = laser->getLaserCorrection( detitr->first, eventTime );
-
-	     // discard rechits with A/sigma < 12
-	     if ( thisamp/(icalconst*lasercalib*adcToGeV) < (1.1*12) ) continue;
-
-	     GlobalPoint pos = theGeometry->getPosition((myhit).detid());
 
              // time and time correction
 	     double thistime = myhit.time();
-	     thistime += theTimeCorrector_.getCorrection((float) thisamp/(icalconst*lasercalib*adcToGeV), pos.eta()  );
 
              // get time error 
              double xtimeErr_ = ( myhit.isTimeErrorValid() ) ?  myhit.timeError() : 999999 ;
@@ -1140,8 +1108,8 @@ pair<double,double> DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle
 
 void DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitCollection> recHitsEB, Handle<EcalRecHitCollection> recHitsEE, PhoInfo& phoTmp, bool useAllClusters ) {
 
-  const EcalIntercalibConstantMap& icalMap = ical->getMap();
-  float adcToGeV = float(agc->getEBValue());
+  //const EcalIntercalibConstantMap& icalMap = ical->getMap();
+  //float adcToGeV = float(agc->getEBValue());
 
   double xtime    = 0 ;
   double xtimeErr = 0 ;
@@ -1193,39 +1161,17 @@ void DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitColl
              maxSwissX = ( isSeed && swissX  > maxSwissX ) ? swissX : maxSwissX ;
              if ( gotSpike && isSeed ) nSpike++  ;
              if ( isSeed             ) nSeedXtl++  ;
-             //if ( gotSpike ) continue ;
-
-             // thisamp is the EB amplitude of the current rechit
-	     double thisamp  = myhit.energy () ;
-	   
-	     EcalIntercalibConstantMap::const_iterator icalit = icalMap.find(detitr->first);
-	     EcalIntercalibConstant icalconst = 1;
-	     if( icalit!=icalMap.end() ) {
-	       icalconst = (*icalit);
-	     } else {
-	       edm::LogError("EcalTimePhyTreeMaker") << "No intercalib const found for xtal " << (detitr->first).rawId();
-   	     }
-	   
-	     // get laser coefficient
-	     float lasercalib = laser->getLaserCorrection( detitr->first, eventTime );
-
-	     // discard rechits with A/sigma < 12
-	     if ( thisamp/(icalconst*lasercalib*adcToGeV) < (1.1*12) ) continue;
-
-	     GlobalPoint pos = theGeometry->getPosition((myhit).detid());
 
              // time and time correction
 	     double thistime = myhit.time();
-	     thistime += theTimeCorrector_.getCorrection((float) thisamp/(icalconst*lasercalib*adcToGeV), pos.eta()  );
+	     //thistime += theTimeCorrector_.getCorrection((float) thisamp/(icalconst*lasercalib*adcToGeV), pos.eta()  );
 
              // get time error 
              double xtimeErr_ = ( myhit.isTimeErrorValid() ) ?  myhit.timeError() : 999999 ;
 
              // calculate chi2 for the BC of the seed
              double chi2_x = pow( ((thistime - phoTmp.t) / xtimeErr_ ) , 2 ) ; 
-             string EBorEE = ( isEB ) ? "EB" : "EE" ;
-             if ( debugT ) printf(" %s xtal(%d)  t: %.2f, dt: %f,  chi2: %.2f , amp: %.2f  \n", 
-                                 EBorEE.c_str(),  (int)ndof, thistime, xtimeErr_,  chi2_x, thisamp );
+
              chi2_bc += chi2_x ;
              ndof += 1 ;
              nXtl++ ;
@@ -1248,67 +1194,6 @@ void DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitColl
   phoTmp.maxSX  = maxSwissX ;
 
 }
-/*
-void DPAnalysis::EventTime( const edm::Event& iEvent ) {
-
-   Handle<EcalRecHitCollection>        recHitsEB ;
-   Handle<EcalRecHitCollection>        recHitsEE ;
-   Handle<reco::BasicClusterCollection> EBClusters ;
-   Handle<reco::BasicClusterCollection> EEBClusters ;
-
-   iEvent.getByLabel( EBRecHitCollection,     recHitsEB );
-   iEvent.getByLabel( EERecHitCollection,     recHitsEE );
-   iEvent.getByLabel( EBBasicClusterCollection, EBClusters) ;
-   iEvent.getByLabel( EEBasicClusterCollection, EEClusters) ;
-
-   // Barrel BasicClusters
-   const reco::BasicClusterCollection* theEBClusters = EBClusters.product () ;
-   
-   // Endcap BasicClusters
-   const reco::BasicClusterCollection* theEEClusters = EEClusters.product () ;
-
-   for (reco::BasicClusterCollection::const_iterator it = theEBClusters->begin () ;
-        it != theEBClusters->end ()  ;  ++it)  {
-
-       for (std::vector<std::pair<DetId, float> >::const_iterator detitr = clusterDetIds.begin () ; 
-	      detitr != clusterDetIds.end () ; ++detitr) {// loop on rechics of barrel basic clusters
-
-       }
-   }
-
-}
-double DPAnalysis::HLTMET( Handle<reco::PFJetCollection> jets, vector<const reco::Muon*>& selectedMuons , bool addMuon ) {
-
-   double hltHT  = 0. ;
-   double hltMEx = 0. ;
-   double hltMEy = 0. ;
-   int nj_mht = 0 ;
-   for(reco::PFJetCollection::const_iterator it = jets->begin(); it != jets->end(); it++) {
-       // fiducial cuts
-       if ( it->pt() < 40. || fabs( it->eta() ) > 999.  ) continue ;
-       hltHT += it->pt() ;
-       hltMEx -= it->p4().Px() ;
-       hltMEy -= it->p4().Py() ;
-       nj_mht++ ;
-   }
- 
-   if ( addMuon ) {  
-      for( size_t i =0 ; i < selectedMuons.size() ; i++) {
-         if ( selectedMuons[i]->pt() < 40 || fabs( selectedMuons[i]->eta() ) > 999. ) continue ;
-         hltMEx -= selectedMuons[i]->p4().Px() ;
-         hltMEy -= selectedMuons[i]->p4().Py() ;
-         nj_mht++ ;
-      }
-   }
-
-   double hltMET = ( nj_mht < 1 ) ? 0 : sqrt( (hltMEx*hltMEx) + (hltMEy*hltMEy) ) ;
-   leaves.hltMet   = hltMET ;
-   leaves.hltMetPx = hltMEx ;
-   leaves.hltMetPy = hltMEy ;
-
-   return hltMET ;
-}
-*/
 
 bool DPAnalysis::JetSelection( Handle<reco::PFJetCollection> jets, vector<const reco::Photon*>& selectedPhotons, 
                                vector<const reco::PFJet*>& selectedJets) {

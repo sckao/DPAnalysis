@@ -62,6 +62,7 @@ void setBranchAddresses(TTree* chain, Ntuple& treeVars)
   chain -> SetBranchAddress("muPy",        treeVars.muPy       );
   chain -> SetBranchAddress("muPz",        treeVars.muPz       );
   chain -> SetBranchAddress("muE",         treeVars.muE        );
+  chain -> SetBranchAddress("muIso",       treeVars.muIso      );
   
   chain -> SetBranchAddress("elePx",        treeVars.elePx     );
   chain -> SetBranchAddress("elePy",        treeVars.elePy     );
@@ -71,6 +72,9 @@ void setBranchAddresses(TTree* chain, Ntuple& treeVars)
   chain -> SetBranchAddress("eleEcalIso",   treeVars.eleEcalIso ) ;
   chain -> SetBranchAddress("eleHcalIso",   treeVars.eleHcalIso ) ;
   chain -> SetBranchAddress("eleTrkIso",    treeVars.eleTrkIso ) ;
+  chain -> SetBranchAddress("e_cHadIso",    treeVars.e_cHadIso ) ;
+  chain -> SetBranchAddress("e_nHadIso",    treeVars.e_nHadIso ) ;
+  chain -> SetBranchAddress("e_photIso",    treeVars.e_photIso ) ;
   
   chain -> SetBranchAddress("jetPx",        treeVars.jetPx     );
   chain -> SetBranchAddress("jetPy",        treeVars.jetPy     );
@@ -118,6 +122,7 @@ void setBranchAddresses(TTree* chain, Ntuple& treeVars)
   chain -> SetBranchAddress("sigmaIeta",    treeVars.sigmaIeta ) ;
   chain -> SetBranchAddress("cscRho",       treeVars.cscRho ) ;
   chain -> SetBranchAddress("cscdPhi",      treeVars.cscdPhi ) ;
+  chain -> SetBranchAddress("cscTime",      treeVars.cscTime ) ;
   chain -> SetBranchAddress("dtdPhi",       treeVars.dtdPhi ) ;
   chain -> SetBranchAddress("dtdEta",       treeVars.dtdEta ) ;
 
@@ -188,6 +193,7 @@ void setBranches(TTree* chain, Ntuple& treeVars)
   chain -> Branch("muPy",        treeVars.muPy,                 "muPy[nMuons]/F");
   chain -> Branch("muPz",        treeVars.muPz,                 "muPz[nMuons]/F");
   chain -> Branch("muE",         treeVars.muE,                  "muE[nMuons]/F");
+  chain -> Branch("muIso",       treeVars.muIso,                "muIso[nMuons]/F");
   
   chain -> Branch("elePx",        treeVars.elePx,                 "elePx[nElectrons]/F");
   chain -> Branch("elePy",        treeVars.elePy,                 "elePy[nElectrons]/F");
@@ -197,6 +203,9 @@ void setBranches(TTree* chain, Ntuple& treeVars)
   chain -> Branch("eleEcalIso",   treeVars.eleEcalIso,            "eleEcalIso[nElectrons]/F") ;
   chain -> Branch("eleHcalIso",   treeVars.eleHcalIso,            "eleHcalIso[nElectrons]/F") ;
   chain -> Branch("eleTrkIso",    treeVars.eleTrkIso,             "eleTrkIso[nElectrons]/F" ) ;
+  chain -> Branch("e_cHadIso",    treeVars.e_cHadIso,             "e_cHadIso[nElectrons]/F") ;
+  chain -> Branch("e_nHadIso",    treeVars.e_nHadIso,             "e_nHadIso[nElectrons]/F") ;
+  chain -> Branch("e_photIso",    treeVars.e_photIso,             "e_photIso[nElectrons]/F") ;
   
   chain -> Branch("jetPx",        treeVars.jetPx,                 "jetPx[nJets]/F");
   chain -> Branch("jetPy",        treeVars.jetPy,                 "jetPy[nJets]/F");
@@ -244,6 +253,7 @@ void setBranches(TTree* chain, Ntuple& treeVars)
   chain -> Branch("sigmaIeta",    treeVars.sigmaIeta,             "sigmaIeta[nPhotons]/I"  ) ;
   chain -> Branch("cscRho",       treeVars.cscRho,                "cscRho[nPhotons]/F"  ) ;
   chain -> Branch("cscdPhi",      treeVars.cscdPhi,               "cscdPhi[nPhotons]/F"  ) ;
+  chain -> Branch("cscTime",      treeVars.cscTime,               "cscTime[nPhotons]/F"  ) ;
   chain -> Branch("dtdPhi",       treeVars.dtdPhi,                "dtdPhi[nPhotons]/F"  ) ;
   chain -> Branch("dtdEta",       treeVars.dtdEta,                "dtdEta[nPhotons]/F"  ) ;
  
@@ -318,6 +328,7 @@ void initializeBranches(TTree* chain, Ntuple& treeVars)
   treeVars.t_phoE  = 0 ;
   treeVars.t_phodR = 99 ;
 
+
   for ( int i=0; i< MAXJET; i++) {
       treeVars.jetPx[i] = 0 ;
       treeVars.jetPy[i] = 0 ;
@@ -344,12 +355,16 @@ void initializeBranches(TTree* chain, Ntuple& treeVars)
       treeVars.eleHcalIso[i] = -1 ;
       treeVars.eleTrkIso[i]  = -1 ;
       treeVars.eleNLostHits[i]  = -1 ;
+      treeVars.e_cHadIso[i]    = -1 ;
+      treeVars.e_nHadIso[i]    = -1 ;
+      treeVars.e_photIso[i]    = -1 ;
   }
   for ( int i=0; i< MAXMU; i++) {
       treeVars.muPx[i] = 0 ;
       treeVars.muPy[i] = 0 ;
       treeVars.muPz[i] = 0 ;
       treeVars.muE[i] = 0 ;
+      treeVars.muIso[i] = -1 ;
   } 
   for ( int i=0; i< MAXPHO; i++) {
       treeVars.phoPx[i] = 0 ;
@@ -383,6 +398,7 @@ void initializeBranches(TTree* chain, Ntuple& treeVars)
       treeVars.sigmaIeta[i]   = -1. ;
       treeVars.cscRho[i]      = -1. ;
       treeVars.cscdPhi[i]     = 99. ;
+      treeVars.cscTime[i]     = 99. ;
       treeVars.dtdPhi[i]      = 99. ;
       treeVars.dtdEta[i]      = 99. ;
   }

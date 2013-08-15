@@ -237,6 +237,7 @@ class DPAnalysis : public edm::EDAnalyzer {
       Ntuple leaves ;
 
       TTree *theTree;
+      TTree *CutFlowTree;
 
       TFile *theFile;
       GenStudy *gen ; 
@@ -308,7 +309,8 @@ class DPAnalysis : public edm::EDAnalyzer {
       std::vector<const reco::Photon*> selectedPhotons ;
 
       bool passEvent ;
-      int counter[10] ; 
+      int counter[12] ; 
+      int gcounter[7] ;
       float sMin_ ;
       int runID_ ;
 

@@ -96,23 +96,22 @@ DPAnalysis::DPAnalysis(const edm::ParameterSet& iConfig){
    theTree  = new TTree ( "DPAnalysis","DPAnalysis" ) ;
    setBranches( theTree, leaves ) ;
 
+   CutFlowTree = new TTree( "CutFlow", "CutFlow") ;
+   CutFlowTree->Branch("counter",   counter,    "counter[12]/I");
+
    targetTrig = 0 ;
    firedTrig.clear() ;
    for ( size_t i=0; i< triggerPatent.size(); i++ ) firedTrig.push_back(-1) ;  
 
    // reset the counter
-   for ( int i=0; i< 10 ; i++) counter[i] = 0 ;
+   for ( int i=0; i< 12 ; i++) counter[i] = 0 ;
 
-   // initialize the time corrector
-   //theTimeCorrector_.initEB("EB");
-   //theTimeCorrector_.initEE("EElow");
    runID_ = 0 ;
-
    debugT = false ;
    rhoIso = 0 ;
    beamspot = 0 ;
 
-   // shitty PF isolation
+   // PF isolation for photon
    isolator.initializePhotonIsolation(kTRUE);
    isolator.setConeSize(0.3);
 
@@ -124,11 +123,15 @@ DPAnalysis::~DPAnalysis()
    // do anything here that needs to be done at desctruction time
 
    delete gen ;
-   cout<<"All:"<< counter[0]<<" Trigger:"<<counter[1]<<" Vertex:"<< counter[2] <<" Photon:"<<counter[3] ;
-   cout<<" beamHalo:"<< counter[4] <<" Jet:"<< counter[5] <<" MET:"<<counter[6] <<" Pre-Selection:"<<counter[7] <<endl ;
+   cout<<"All:"<< counter[0]<<" Trigger:"<<counter[1]<<" Vertex:"<< counter[2] ;
+   cout<<" Fiducial: "<< counter[3]<<" Conversion: "<< counter[4]<<" sMaj_sMin: "<< counter[5]<<" dR(g,trk):"<< counter[6] ;
+   cout<<" LeadingPt:"<<counter[7] ;
+   cout<<" beamHalo:"<< counter[8] <<" Jet:"<< counter[9] <<" MET:"<<counter[10] <<" Pre-Selection:"<<counter[11] <<endl ;
+   CutFlowTree->Fill() ;
 
    theFile->cd () ;
    theTree->Write() ; 
+   CutFlowTree->Write() ; 
    theFile->Close() ;
 
 }
@@ -140,16 +143,6 @@ DPAnalysis::~DPAnalysis()
 // ------------ method called for each event  ------------
 void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup) {
 
-   // get calibration service
-   // IC's
-   //iSetup.get<EcalIntercalibConstantsRcd>().get(ical);
-   // ADCtoGeV
-   //iSetup.get<EcalADCToGeVConstantRcd>().get(agc);
-   // transp corrections
-   //iSetup.get<EcalLaserDbRecord>().get(laser);
-   // Geometry
-   //iSetup.get<CaloGeometryRecord> ().get (pGeometry) ;
-   //theGeometry = pGeometry.product() ;
    // event time
    eventTime = iEvent.time() ;
    // Initialize ntuple branches
@@ -158,8 +151,8 @@ void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
    leaves.bx          = iEvent.bunchCrossing();
    leaves.lumiSection = iEvent.id().luminosityBlock();
    leaves.orbit       = iEvent.orbitNumber();
-   leaves.runId       = iEvent.id ().run () ;
-   leaves.eventId     = iEvent.id ().event () ;
+   leaves.runId       = iEvent.id().run() ;
+   leaves.eventId     = iEvent.id().event() ;
 
    /* 
    Handle<std::vector< PileupSummaryInfo > >  PileUpInfo;
@@ -170,11 +163,9 @@ void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
    */
 
    // For conversion veto
-   //Handle<reco::BeamSpot> bsHandle;
    iEvent.getByLabel( beamSpotSource, bsHandle);
    beamspot = bsHandle.product();
 
-   //Handle<reco::ConversionCollection> hConversions;
    iEvent.getByLabel("allConversions", hConversions);
    iEvent.getByLabel( electronSource, electrons);
 
@@ -196,7 +187,8 @@ void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
    //ESHandle<GlobalTrackingGeometry> trackingGeometry;
    //iSetup.get<GlobalTrackingGeometryRecord>().get(trackingGeometry);
 
-   counter[0]++ ;  
+   counter[0]++ ;  // All events
+
    // L1 Trigger Selection
    passL1 = L1TriggerSelection( iEvent, iSetup ) ;
 
@@ -211,7 +203,7 @@ void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
    // Using L1 or HLT to select events ?!
    bool passTrigger = ( L1Select ) ? passL1 : passHLT  ;
 
-   if ( passTrigger ) counter[1]++ ;  
+   if ( passTrigger ) counter[1]++ ;   // Pass trigger cut
 
    // get the generator information
    if ( !isData && tau > -0.1 ) { 
@@ -221,9 +213,8 @@ void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
    //if ( !isData ) gen->PrintGenEvent( iEvent );
 
    bool pass = EventSelection( iEvent, iSetup ) ;
-   if ( pass && passTrigger ) counter[7]++ ;   
+   if ( pass && passTrigger ) counter[11]++ ;   
 
-  
    // fill the ntuple
    if ( pass && !isData ) theTree->Fill();
    if ( pass && isData && passTrigger ) theTree->Fill();
@@ -262,7 +253,6 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent, const edm::EventSetup&
    iEvent.getByLabel( trackSource,    tracks  );
    iEvent.getByLabel( "particleFlow", pfCand ) ;
    
-
    bool passEvent = true ;
 
    // find trigger matched objects
@@ -275,15 +265,24 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent, const edm::EventSetup&
    //cout<<" ================= "<<endl ;
    //cout<<" "<<endl ;
   
-
    bool hasGoodVtx = VertexSelection( recVtxs );
    if ( !hasGoodVtx ) passEvent = false ;
-   if ( passEvent )   counter[2]++ ;  
+   if ( passEvent )   counter[2]++ ;  // pass vertex cuts
 
    selectedPhotons.clear() ;
    PhotonSelection( photons, recHitsEB, recHitsEE, tracks, selectedPhotons ) ;
+
+   // Check event flow with photon cuts 
+   if ( passEvent ) {
+      if ( gcounter[2] > 0 ) counter[3]++  ;  // pt & fiducial 
+      if ( gcounter[3] > 0 ) counter[4]++  ;  // conversion 
+      if ( gcounter[5] > 0 ) counter[5]++ ;   // sMaj & sMin
+      if ( gcounter[6] > 0 ) counter[6]++ ;   // dR(phot, track)
+   }
+
    if ( selectedPhotons.size() < (size_t)photonCuts[6] )  passEvent = false ;
-   if ( passEvent )   counter[3]++ ;  
+   if ( passEvent )   counter[7]++ ;  // pass photon cuts
+
    // Stupid PFIso 
    if ( passEvent ) { 
       reco::VertexRef vtxRef(recVtxs, 0);
@@ -293,12 +292,12 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent, const edm::EventSetup&
    if( beamHaloSummary.isValid() ) {
      const reco::BeamHaloSummary TheSummary = (*beamHaloSummary.product() ); 
      if( !TheSummary.CSCTightHaloId() && passEvent ) { 
-       counter[4]++ ;  
+       counter[8]++ ;  
      } else {
        passEvent = false ;
      }
    } else {
-       counter[4]++ ;
+       counter[8]++ ;
    }
    CSCHaloCleaning( iEvent, selectedPhotons ) ;
 
@@ -309,8 +308,8 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent, const edm::EventSetup&
    
    Handle<DTRecSegment4DCollection>   dtSegments ;
    iEvent.getByLabel( DTSegmentTag,   dtSegments );
-   //CosmicRayMatch( dtSegments, selectedPhotons, iSetup ) ;
-   CosmicRayMatch( muons, selectedPhotons ) ;
+   CosmicRayMatch( dtSegments, selectedPhotons, iSetup ) ;
+   //CosmicRayMatch( muons, selectedPhotons ) ;
    
    //Handle< edm::OwnVector<TrackingRecHit> >  mu_rhits ;
    //iEvent.getByLabel( staMuons,  mu_rhits );
@@ -325,7 +324,7 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent, const edm::EventSetup&
    //bool isGammaJets = GammaJetVeto( selectedPhotons, selectedJets ) ;
    //if ( isGammaJets ) passEvent = false ;
    if ( selectedJets.size() < jetCuts[3] )   passEvent = false ;
-   if ( passEvent )   counter[5]++ ;   
+   if ( passEvent )   counter[9]++ ;   
    
    //JERUncertainty( patjets ) ;
    selectedElectrons.clear() ;
@@ -346,7 +345,7 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent, const edm::EventSetup&
    leaves.metPy = pfMet.py() ;
 
    if ( pfMet.pt() < metCuts[0]  ) passEvent = false;
-   if ( passEvent )  counter[6]++ ;  
+   if ( passEvent )  counter[10]++ ;  
 
    return passEvent ;
 }
@@ -618,34 +617,9 @@ bool DPAnalysis::VertexSelection( Handle<reco::VertexCollection> vtx ) {
      return hasGoodVertex ;
 }
 
-/*
-bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle<EcalRecHitCollection> recHitsEB, Handle<EcalRecHitCollection> recHitsEE, Handle<reco::TrackCollection> tracks ) {
-
-   int cuts[5]= {0} ;
-   double maxPt = 0 ;
-   for(reco::PhotonCollection::const_iterator it = photons->begin(); it != photons->end(); it++) {
-
-       if ( ConversionVeto( &(*it) ) ) continue; 
-       if ( it->pt() > photonCuts[0] )          cuts[0]++  ;
-       if ( fabs( it->eta() ) > photonCuts[1] ) cuts[1]++  ;
-
-       // S_Minor Cuts from the seed cluster
-       reco::CaloClusterPtr SCseed = it->superCluster()->seed() ;
-       const EcalRecHitCollection* rechits = ( it->isEB()) ? recHitsEB.product() : recHitsEE.product() ;
-
-       Cluster2ndMoments moments = EcalClusterTools::cluster2ndMoments(*SCseed, *rechits);
-       float sMin =  moments.sMin  ;
-       if ( sMin >= photonCuts[3] || sMin <= photonCuts[4] ) cuts[2]++ ;
-
-       // check leading photon pt  
-       maxPt = ( it->pt() > maxPt ) ? it->pt() : maxPt ;
-   }
-
-}
-*/
-
 bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle<EcalRecHitCollection> recHitsEB, Handle<EcalRecHitCollection> recHitsEE, Handle<reco::TrackCollection> tracks, vector<const reco::Photon*>& selectedPhotons ) {
 
+   for ( int i=0; i<7; i++) gcounter[i] = 0 ;
    int k= 0 ;
    double maxPt = 0 ;
    double met_dx(0), met_dy(0) ; 
@@ -660,9 +634,12 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
        met_dx -= ( it->px() * ptscale ) ;
        met_dy -= ( it->py() * ptscale ) ;
 
+       gcounter[0]++ ;
        // fiducial cuts
        if ( k >= MAXPHO ) continue ;
+       gcounter[1]++ ;
        if ( it->pt() < photonCuts[0] || fabs( it->eta() ) > photonCuts[1] ) continue ;
+       gcounter[2]++ ;
        //float hcalIsoRatio = it->hcalTowerSumEtConeDR04() / it->pt() ;
        //if  ( ( hcalIsoRatio + it->hadronicOverEm() )*it->energy() >= 6.0 ) continue ;
       
@@ -670,6 +647,7 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
        //if ( it->hasPixelSeed() ) continue ;
        //if ( ConversionVeto( &(*it) ) ) cout<<" Got Conversion Case !! " << endl ; 
        if ( ConversionVeto( &(*it) ) ) continue; 
+       gcounter[3]++ ;
 
        // S_Minor Cuts from the seed cluster
        reco::CaloClusterPtr SCseed = it->superCluster()->seed() ;
@@ -689,7 +667,9 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
 
        // sMin and sMaj cuts
        if ( sMaj  > photonCuts[2] ) continue ;
+       gcounter[4]++ ;
        if ( sMin <= photonCuts[3] || sMin >= photonCuts[4] ) continue ;
+       gcounter[5]++ ;
 
        // Isolation Cuts 
        float ecalSumEt = it->ecalRecHitSumEtConeDR04();
@@ -722,6 +702,7 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
 	   if ( dR < photonCuts[5] )  nTrk++ ;
        }
        if ( nTrk > 0 ) continue ;
+       gcounter[6]++ ;
 
        // check leading photon pt  
        maxPt = ( it->pt() > maxPt ) ? it->pt() : maxPt ;
@@ -877,6 +858,8 @@ bool DPAnalysis::CosmicRayMatch( Handle<reco::MuonCollection> muons, vector<cons
    return true ;
 }
 */
+
+// Use CosmicMuon track
 bool DPAnalysis::CosmicRayMatch( Handle<reco::MuonCollection> muons, vector<const reco::Photon*>& selectedPhotons ) 
 {
 
@@ -1014,8 +997,9 @@ bool DPAnalysis::BeamHaloMatch( Handle<CSCSegmentCollection> cscSeg, vector<cons
    bool halomatch = false ;
    for ( size_t i=0; i< selectedPhotons.size() ; i++ ) {
 
-       double dPhi = 99. ;
-       double cscRho = -1 ;
+       double dPhi    = 99. ;
+       double cscRho  = -1 ;
+       double cscTime = 99. ;
        for (CSCSegmentCollection::const_iterator it = cscSeg->begin(); it != cscSeg->end(); it++) {
            if ( !it->isValid() ) continue ;
            CSCDetId DetId = it->cscDetId();
@@ -1033,11 +1017,13 @@ bool DPAnalysis::BeamHaloMatch( Handle<CSCSegmentCollection> cscSeg, vector<cons
            if ( fabs(dPhi_) < dPhi ) {
               dPhi = fabs( dPhi_ ) ;
               cscRho = rho ;
+              cscTime   = it->time() ;
            }
        }
        if ( dPhi < 0.1 )  halomatch = true ;
-       leaves.cscRho[i]  = cscRho ;
-       leaves.cscdPhi[i]  = dPhi ;
+       leaves.cscRho[i]    = cscRho ;
+       leaves.cscdPhi[i]   = dPhi ;
+       leaves.cscTime[i]  = cscTime ;
 
    }
    return halomatch ;
@@ -1476,8 +1462,9 @@ bool DPAnalysis::ElectronSelection( Handle<reco::GsfElectronCollection> electron
        float trkSumPt  = it->dr03TkSumPt();  
        double relIso   = (ecalSumEt + hcalSumEt + trkSumPt) / it->pt() ;
 
-       if ( relIso > electronCuts[2] &&  it->isEB() ) continue ;
-       if ( relIso > electronCuts[3] && !it->isEB() ) continue ;
+       // obsoleted
+       //if ( relIso > electronCuts[2] &&  it->isEB() ) continue ;
+       //if ( relIso > electronCuts[3] && !it->isEB() ) continue ;
 
        double nLost = it->gsfTrack()->trackerExpectedHitsInner().numberOfLostHits() ;
        if ( nLost >= electronCuts[4]  ) continue ;
@@ -1491,6 +1478,9 @@ bool DPAnalysis::ElectronSelection( Handle<reco::GsfElectronCollection> electron
        leaves.eleHcalIso[k] = hcalSumEt ;
        leaves.eleTrkIso[k]  = trkSumPt ;
        leaves.eleNLostHits[k]  = nLost ;
+       leaves.e_cHadIso[k]  = it->pfIsolationVariables().chargedHadronIso ;
+       leaves.e_nHadIso[k]  = it->pfIsolationVariables().neutralHadronIso ;
+       leaves.e_photIso[k]  = it->pfIsolationVariables().photonIso ;
        k++;
    }
    leaves.nElectrons = (int)( selectedElectrons.size() ) ;
@@ -1510,7 +1500,7 @@ bool DPAnalysis::MuonSelection( Handle<reco::MuonCollection> muons, vector<const
        // Isolation for PAT muon
        //double relIso =  ( it->chargedHadronIso()+ it->neutralHadronIso() + it->photonIso () ) / it->pt();
        // Isolation for RECO muon
-       double relIso =0. ;
+       double relIso = 99. ;
        if ( it->isIsolationValid() ) {
 	 relIso = ( it->isolationR05().emEt + it->isolationR05().hadEt + it->isolationR05().sumPt ) / it->pt();
        }
@@ -1529,6 +1519,7 @@ bool DPAnalysis::MuonSelection( Handle<reco::MuonCollection> muons, vector<const
        leaves.muPy[k] = it->p4().Py() ;
        leaves.muPz[k] = it->p4().Pz() ;
        leaves.muE[k]  = it->p4().E() ;
+       leaves.muIso[k] = relIso ;
        k++ ;
    }
    leaves.nMuons = (int)( selectedMuons.size() ) ;

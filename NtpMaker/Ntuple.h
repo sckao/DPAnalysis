@@ -28,7 +28,6 @@ struct Ntuple
   
   //int nTrksSmallBeta ;
   //int nHaloSegs ;
-  
 
   // vertex variables
   int   nVertices;
@@ -91,13 +90,17 @@ struct Ntuple
   int   eleNLostHits[MAXELE] ;
   float eleEcalIso[MAXELE];
   float eleHcalIso[MAXELE];
-  float eleTrkIso[MAXELE];
+  float eleTrkIso[MAXELE] ;
+  float e_cHadIso[MAXELE] ;
+  float e_nHadIso[MAXELE] ;
+  float e_photIso[MAXELE] ;
 
   int   nMuons ;
   float muPx[MAXMU];
   float muPy[MAXMU];
   float muPz[MAXMU];
   float muE[MAXMU];
+  float muIso[MAXMU];
 
   int   nPhotons ;
   float phoPx[MAXPHO];
@@ -132,6 +135,7 @@ struct Ntuple
 
   float cscRho[MAXPHO];
   float cscdPhi[MAXPHO];
+  float cscTime[MAXPHO];
   float dtdEta[MAXPHO];
   float dtdPhi[MAXPHO];
 

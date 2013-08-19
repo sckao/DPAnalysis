@@ -143,6 +143,17 @@ DPAnalysis::~DPAnalysis()
 // ------------ method called for each event  ------------
 void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup) {
 
+   // get calibration service
+   // IC's
+   iSetup.get<EcalIntercalibConstantsRcd>().get(ical);
+   // ADCtoGeV
+   iSetup.get<EcalADCToGeVConstantRcd>().get(agc);
+   // transp corrections
+   iSetup.get<EcalLaserDbRecord>().get(laser);
+   // Geometry
+   //iSetup.get<CaloGeometryRecord> ().get (pGeometry) ;
+   //theGeometry = pGeometry.product() ;
+
    // event time
    eventTime = iEvent.time() ;
    // Initialize ntuple branches
@@ -1094,8 +1105,9 @@ pair<double,double> DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle
 
 void DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitCollection> recHitsEB, Handle<EcalRecHitCollection> recHitsEE, PhoInfo& phoTmp, bool useAllClusters ) {
 
-  //const EcalIntercalibConstantMap& icalMap = ical->getMap();
-  //float adcToGeV = float(agc->getEBValue());
+  const EcalIntercalibConstantMap& icalMap = ical->getMap();
+  float adcToGeV_EB = float(agc->getEBValue());
+  float adcToGeV_EE = float(agc->getEEValue());
 
   double xtime    = 0 ;
   double xtimeErr = 0 ;
@@ -1147,6 +1159,24 @@ void DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitColl
              maxSwissX = ( isSeed && swissX  > maxSwissX ) ? swissX : maxSwissX ;
              if ( gotSpike && isSeed ) nSpike++  ;
              if ( isSeed             ) nSeedXtl++  ;
+
+             // thisamp is the EB amplitude of the current rechit
+             double thisamp  = myhit.energy () ;
+             EcalIntercalibConstantMap::const_iterator icalit = icalMap.find(detitr->first);
+             EcalIntercalibConstant icalconst = 1;
+             if( icalit!=icalMap.end() ) {
+               icalconst = (*icalit);
+             } else {
+               edm::LogError("EcalTimePhyTreeMaker") << "No intercalib const found for xtal " << (detitr->first).rawId();
+             }
+
+             // get laser coefficient
+             float lasercalib = laser->getLaserCorrection( detitr->first, eventTime );
+
+             float adcToGeV = ( isEB ) ? adcToGeV_EB : adcToGeV_EE ;
+             // discard rechits with A/sigma < 12
+             if ( thisamp/(icalconst*lasercalib*adcToGeV) < (1.1*12) ) continue;
+             //GlobalPoint pos = theGeometry->getPosition((myhit).detid());
 
              // time and time correction
 	     double thistime = myhit.time();
@@ -1460,7 +1490,7 @@ bool DPAnalysis::ElectronSelection( Handle<reco::GsfElectronCollection> electron
        float ecalSumEt = ( it->isEB() ) ? max(0., it->dr03EcalRecHitSumEt() - 1. ) : it->dr03EcalRecHitSumEt();
        float hcalSumEt = it->dr03HcalTowerSumEt();
        float trkSumPt  = it->dr03TkSumPt();  
-       double relIso   = (ecalSumEt + hcalSumEt + trkSumPt) / it->pt() ;
+       //double relIso   = (ecalSumEt + hcalSumEt + trkSumPt) / it->pt() ;
 
        // obsoleted
        //if ( relIso > electronCuts[2] &&  it->isEB() ) continue ;

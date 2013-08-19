@@ -84,7 +84,13 @@
 #include "DataFormats/EgammaReco/interface/SuperClusterFwd.h"
 #include "DataFormats/EcalRecHit/interface/EcalRecHitCollections.h"
 #include "RecoEcal/EgammaCoreTools/interface/EcalClusterTools.h"
-#include <algorithm>
+
+#include "CondFormats/EcalObjects/interface/EcalIntercalibConstants.h"
+#include "CondFormats/DataRecord/interface/EcalIntercalibConstantsRcd.h"
+#include "CondFormats/EcalObjects/interface/EcalADCToGeVConstant.h"
+#include "CondFormats/DataRecord/interface/EcalADCToGeVConstantRcd.h"
+#include "CalibCalorimetry/EcalLaserCorrection/interface/EcalLaserDbService.h"
+#include "CalibCalorimetry/EcalLaserCorrection/interface/EcalLaserDbRecord.h"
 
 // for CSC Segment
 #include "DataFormats/CSCRecHit/interface/CSCSegmentCollection.h"
@@ -130,6 +136,7 @@
 
 //#include "EGamma/EGammaAnalysisTools/src/PFIsolationEstimator.cc"
 #include "PFIsolationEstimator.h"
+#include <algorithm>
 
 // global tracking geometry
 //#include "Geometry/Records/interface/GlobalTrackingGeometryRecord.h"
@@ -271,9 +278,9 @@ class DPAnalysis : public edm::EDAnalyzer {
       edm::InputTag staMuons ;
 
       //edm::InputTag pileupSource ;
-      //edm::ESHandle<EcalIntercalibConstants> ical;
-      //edm::ESHandle<EcalADCToGeVConstant> agc;
-      //edm::ESHandle<EcalLaserDbService> laser;
+      edm::ESHandle<EcalIntercalibConstants> ical;
+      edm::ESHandle<EcalADCToGeVConstant> agc;
+      edm::ESHandle<EcalLaserDbService> laser;
       edm::ESHandle<CaloGeometry> pGeometry ;
       const CaloGeometry * theGeometry ;
       //edm::ESHandle<GlobalTrackingGeometry> trackingGeometry;

@@ -173,6 +173,32 @@ struct PhoInfo {
 
 } ;
 
+struct VtxInfo {
+
+  int nTracks ;
+  double ndof ;
+  double chi2 ;
+  double x ;
+  double y ;
+  double z ;
+  double dx ;
+  double dy ;
+  double dz ;
+  double ht ;
+  
+} ;
+
+struct TrkInfo {
+
+  double dz ;
+  double dsz ;
+  double d0 ;
+  double pt ;
+  double vz ;
+  double vr ;
+
+} ;
+
 typedef const pat::Jet pat_Jet ;
 
 class ConversionTools ;
@@ -197,6 +223,7 @@ class DPAnalysis : public edm::EDAnalyzer {
       template<typename object>
       bool GetTrgMatchObject( object, const edm::Event& iEvent, edm::InputTag inputProducer_ ) ;
 
+      void Track_Z0( edm::Handle<reco::TrackCollection> trks ) ;
       bool VertexSelection( edm::Handle<reco::VertexCollection> vtx ) ;
 
       bool PhotonSelection(  edm::Handle<reco::PhotonCollection> photons, edm::Handle<EcalRecHitCollection> recHitsEB, edm::Handle<EcalRecHitCollection> recHitsEE, edm::Handle<reco::TrackCollection> tracks, vector<const reco::Photon*>& selectedPhotons ) ;
@@ -245,6 +272,7 @@ class DPAnalysis : public edm::EDAnalyzer {
 
       TTree *theTree;
       TTree *CutFlowTree;
+      TH1   *h_z0 ;
 
       TFile *theFile;
       GenStudy *gen ; 

@@ -41,6 +41,8 @@ struct Ntuple
   float vtxDy[MAXVTX];
   float vtxZ[MAXVTX];
   float vtxDz[MAXVTX];
+  float vtxHt[MAXVTX];
+  int   nTrkZ0[33];
   
   // reco variables
   int   nJets ;

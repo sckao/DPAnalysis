@@ -44,6 +44,10 @@ using namespace cms ;
 using namespace edm ;
 using namespace std ;
 
+static bool HtDecreasing( VtxInfo s1, VtxInfo s2) { return ( s1.ht > s2.ht ); }
+static bool ZDecreasing( VtxInfo s1, VtxInfo s2) { return ( s1.z > s2.z ); }
+static bool Z0Decreasing( TrkInfo s1, TrkInfo s2) { return ( s1.dz > s2.dz ); }
+
 // constants, enums and typedefs
 // static data member definitions
 
@@ -99,6 +103,8 @@ DPAnalysis::DPAnalysis(const edm::ParameterSet& iConfig){
    CutFlowTree = new TTree( "CutFlow", "CutFlow") ;
    CutFlowTree->Branch("counter",   counter,    "counter[12]/I");
 
+   h_z0 = new TH1D("h_z0", " z0 for tracks", 121, -181.5, 181.5 ) ;
+
    targetTrig = 0 ;
    firedTrig.clear() ;
    for ( size_t i=0; i< triggerPatent.size(); i++ ) firedTrig.push_back(-1) ;  
@@ -132,6 +138,8 @@ DPAnalysis::~DPAnalysis()
    theFile->cd () ;
    theTree->Write() ; 
    CutFlowTree->Write() ; 
+   h_z0->Write() ;
+
    theFile->Close() ;
 
 }
@@ -275,7 +283,9 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent, const edm::EventSetup&
    GetTrgMatchObject( pfMet_, iEvent,  metSource ) ;
    //cout<<" ================= "<<endl ;
    //cout<<" "<<endl ;
-  
+
+   Track_Z0( tracks ) ;
+
    bool hasGoodVtx = VertexSelection( recVtxs );
    if ( !hasGoodVtx ) passEvent = false ;
    if ( passEvent )   counter[2]++ ;  // pass vertex cuts
@@ -593,38 +603,157 @@ void DPAnalysis::PrintTriggers( const edm::Event& iEvent ) {
    }
 }
 
+
+void DPAnalysis::Track_Z0( Handle<reco::TrackCollection> tracks ) {
+
+    //vector<TrkInfo> trkColl ;
+    for (reco::TrackCollection::const_iterator it = tracks->begin(); it != tracks->end(); it++ )  {
+        if ( fabs(it->d0()) >= vtxCuts[2] ) continue ;
+         /*
+         TrkInfo tf ;
+         tf.dz  = it->dz() ;
+         tf.dsz = it->dsz() ;
+         tf.d0  = it->d0() ;
+         tf.pt  = it->pt() ;
+         tf.vz  = it->vz() ;
+         tf.vr  = sqrt( (it->vx()*it->vx()) + (it->vy()*it->vy()) ) ;
+         trkColl.push_back(tf) ;
+         */
+         h_z0->Fill( it->dz() ) ;
+
+         /*
+         int ibin = 0 ; 
+         if ( it->dz()  < -125. )                  ibin = 1  ;
+         if ( it->dz() >= -125 && it->dz() < -25 ) ibin = (int)( ( it->dz() + 125. ) / 10. ) + 2 ;
+         if ( it->dz() >=  -25 && it->dz() <  25 ) ibin = (int)( ( it->dz() +  25. ) /  5. ) + 12 ;
+         if ( it->dz() >=   25 && it->dz() < 125 ) ibin = (int)( ( it->dz() -  25. ) / 10. ) + 22 ;
+         if ( it->dz()  >  125. )                  ibin = 32 ;
+         */
+         int ibin = (int)( (it->dz() + 155. ) / 10.) + 1;
+         if ( it->dz() < -155. ) ibin = 0 ;
+         if ( it->dz() >  155. ) ibin = 33 ;
+
+         leaves.nTrkZ0[ ibin ] += 1 ;
+    }
+
+    /*
+    sort( trkColl.begin(), trkColl.end(), Z0Decreasing ) ;
+    
+    //printf("=============================== \n") ;
+    vector<TrkInfo> selTrk ;
+    double ddz = 99. ;
+    for (size_t i=0 ; i < trkColl.size() ; i++) {
+        //printf( "= dZ = %f , dsz: %f, d0: %f, pt: %f ", trkColl[i].dz , trkColl[i].dsz, trkColl[i].d0, trkColl[i].pt ) ;
+        //printf( " v_z: %f , v_r: %f ", trkColl[i].vz , trkColl[i].vr ) ;
+        ddz = ( i > 0 ) ? fabs( trkColl[i].dz - selTrk[ selTrk.size() -1 ].dz ) : 99. ;
+        if ( ddz > 1. ) {
+           selTrk.push_back( trkColl[i] ) ;
+           //printf("  -- add \n") ;
+        } else  {
+           if (  trkColl[i].pt >  selTrk[ selTrk.size() -1 ].pt ) {
+              //printf("  \n") ;
+              //printf("  =>  delete track : dZ: %f, pt: %f \n", selTrk[ selTrk.size()-1].dz ,  selTrk[ selTrk.size()-1].pt ) ;
+              selTrk.erase( selTrk.end() - 1 );
+              selTrk.push_back( trkColl[i] ) ;
+              //printf("  =>  add    track : dZ: %f, pt: %f \n", selTrk[ selTrk.size()-1].dz ,  selTrk[ selTrk.size()-1].pt ) ;
+           } else {
+              //printf("  -- skip \n") ;
+           }
+        } 
+    }
+    printf("  ----------------- \n") ;
+    for (size_t i=0 ; i < selTrk.size() ; i++) {
+        printf( "* dZ = %f , dsz: %f, d0: %f, pt: %f \n", selTrk[i].dz , selTrk[i].dsz, selTrk[i].d0, selTrk[i].pt ) ;
+    }
+    */
+}
+
 bool DPAnalysis::VertexSelection( Handle<reco::VertexCollection> vtx ) {
 
-    int thisVertex=0;
     bool hasGoodVertex = true ;
     int totalN_vtx = 0 ;
-    for(reco::VertexCollection::const_iterator v=vtx->begin();  v!=vtx->end() ; v++){
+    vector<VtxInfo> vtxColl ;
+    //printf("************************************ \n") ;
+    // 1. Select tracks and vertices, sort vertices in their z positions
+    for (reco::VertexCollection::const_iterator v=vtx->begin();  v!=vtx->end() ; v++){
 
-       if ( ! v->isValid() ||  v->isFake() ) continue ;
-       if ( fabs(v->z()) >= vtxCuts[0] ) continue ; 
-       if (   v->ndof()   < vtxCuts[1] ) continue ;
-       double d0 = sqrt( ( v->x()*v->x() ) + ( v->y()*v->y() ) );
-       if ( d0 >= vtxCuts[2] ) continue ;
-       // counting real number of vertices
-       totalN_vtx++ ;
+        if ( ! v->isValid() ||  v->isFake() ) continue ;
 
-       if ( thisVertex >= MAXVTX ) continue ;
-       leaves.vtxNTracks[thisVertex]= v->tracksSize();
-       leaves.vtxChi2[thisVertex] =   v->chi2();
-       leaves.vtxNdof[thisVertex] =   v->ndof();
-       leaves.vtxX[thisVertex] =      v->x();
-       leaves.vtxY[thisVertex] =      v->y();
-       leaves.vtxZ[thisVertex] =      v->z();
-       leaves.vtxDx[thisVertex] =     v->xError();
-       leaves.vtxDy[thisVertex] =     v->yError();
-       leaves.vtxDz[thisVertex] =     v->zError();
-       
-       thisVertex++ ;
+        //printf("@@  N of trk: %d , ndof: %.1f", (int)v->tracksSize(), v->ndof() ) ;
+        int ntrk = 0;
+        double ht = 0 ;
+        for (reco::Vertex::trackRef_iterator itrk = v->tracks_begin(); itrk != v->tracks_end(); ++itrk) {
+            double d0 = (*itrk)->d0() ;
+            //double z0 = (*itrk)->dz() ;
+            //double sz = (*itrk)->dsz() ;
+            //printf("*   d0: %f , z0: %f , sz: %f \n", d0, z0 , sz ) ;
+            if ( d0 >= vtxCuts[2] ) continue ;
+            ht += (*itrk)->pt() ;
+            ntrk++ ;
+        }
+        //printf(" N of trk: %d , ht: %f, vtx_z: %f \n", ntrk, ht, v->z() ) ;
+
+        //if ( fabs(v->z()) >= vtxCuts[0] ) continue ; 
+        if (   v->ndof()   < vtxCuts[1] ) continue ;
+        // counting real number of vertices
+        totalN_vtx++ ;
+
+        VtxInfo vi ;
+        vi.nTracks = ntrk ;
+        vi.ndof = v->ndof() ;
+        vi.chi2 = v->normalizedChi2() ;
+        vi.ht   = ht ; 
+        vi.x    = v->x() ;
+        vi.y    = v->y() ;
+        vi.z    = v->z() ;
+        vi.dx   = v->xError() ;
+        vi.dy   = v->yError() ;
+        vi.dz   = v->zError() ;
+        vtxColl.push_back( vi ) ;
      }
-     leaves.nVertices = thisVertex ;
+     sort( vtxColl.begin(), vtxColl.end(), ZDecreasing ) ;
+
+     vector<VtxInfo> selVtx ;
+     double dz = 99. ;
+     //printf(" ^^^^^^^^^^^^ \n") ;
+     for ( size_t i=0; i< vtxColl.size() ; i++ ) {
+         //printf("**  Z = %f, N of trk: %d , ndof: %.1f , ht: %f , sz:%d \n", 
+         //        vtxColl[i].z, vtxColl[i].nTracks, vtxColl[i].ndof, vtxColl[i].ht, (int) selVtx.size() ) ;
+
+         dz = ( i > 0 ) ? fabs( vtxColl[i].z - selVtx[ selVtx.size()-1 ].z ) : 99. ;
+         if ( dz > 1. ) {
+            selVtx.push_back( vtxColl[i] ) ;
+         } else  {
+            if (  vtxColl[i].ht > selVtx[ selVtx.size()-1].ht ) {
+               selVtx.erase( selVtx.end() - 1 );
+               selVtx.push_back( vtxColl[i] ) ;
+            }
+         } 
+
+     }
+     sort( selVtx.begin(), selVtx.end(), HtDecreasing ) ;
+
+     //printf(" ----------- \n") ;
+     for ( size_t i=0; i< selVtx.size() ; i++ ) {
+         //printf("==  Z = %f, N of trk: %d , ndof: %.1f , ht: %f \n", 
+         //        selVtx[i].z, selVtx[i].nTracks, selVtx[i].ndof, selVtx[i].ht ) ;
+
+         if ( i >= MAXVTX ) continue ;
+         leaves.vtxNTracks[i]= selVtx[i].nTracks;
+	 leaves.vtxChi2[i] =   selVtx[i].chi2   ;
+	 leaves.vtxNdof[i] =   selVtx[i].ndof   ;
+	 leaves.vtxX[i] =      selVtx[i].x  ;
+	 leaves.vtxY[i] =      selVtx[i].y  ;
+	 leaves.vtxZ[i] =      selVtx[i].z  ;
+	 leaves.vtxDx[i] =     selVtx[i].dx ;
+	 leaves.vtxDy[i] =     selVtx[i].dy ;
+	 leaves.vtxDz[i] =     selVtx[i].dz ;
+         leaves.vtxHt[i] =     selVtx[i].ht ;
+     }
+     leaves.nVertices = ( selVtx.size() > 10 ) ? 10 :  (int) selVtx.size() ;
      leaves.totalNVtx = totalN_vtx ;
  
-     if ( thisVertex < 1 )   hasGoodVertex = false ;
+     if ( vtxColl.size() < 1 )   hasGoodVertex = false ;
      return hasGoodVertex ;
 }
 
@@ -1077,8 +1206,9 @@ pair<double,double> DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle
 	     EcalRecHit myhit = (*thishit) ;
 	   
              // SIC Feb 14 2011 -- Add check on RecHit flags (takes care of spike cleaning in 42X)
-             if ( !( myhit.checkFlag(EcalRecHit::kGood) || myhit.checkFlag(EcalRecHit::kOutOfTime) || 
-                    myhit.checkFlag(EcalRecHit::kPoorCalib)  ) )  continue;
+             //if ( !( myhit.checkFlag(EcalRecHit::kGood) || myhit.checkFlag(EcalRecHit::kOutOfTime) || 
+             //       myhit.checkFlag(EcalRecHit::kPoorCalib)  ) )  continue;
+             if ( !( myhit.checkFlag(EcalRecHit::kGood) || myhit.checkFlag(EcalRecHit::kOutOfTime) ) )  continue;
 
              nXtl++ ;
 
@@ -1690,6 +1820,28 @@ void DPAnalysis::PhotonPFIso( std::vector<const reco::Photon*> thePhotons, const
         //printf(" cHad: %.3f, nHad: %.3f, phot: %.3f \n", leaves.cHadIso[k],  leaves.nHadIso[k],  leaves.photIso[k] ) ;
     }
 }
+
+/*
+void DPAnalysis::VertexFinder( Handle<reco::TrackCollection> tracks ) {
+
+    // prepare a histogram vector with 101 elements, bin size =  3cm -> -151.5 ~ 151.5 cm
+    int hTrk[101] = { 0 } ;
+    for (reco::TrackCollection::const_iterator it = tracks->begin(); it != tracks->end(); it++ )  {
+        if ( fabs(it->d0()) > 2. ) continue ;
+         TrkInfo tf ;
+         tf.dz  = it->dz() ;
+         tf.dsz = it->dsz() ;
+         tf.d0  = it->d0() ;
+         tf.pt  = it->pt() ;
+         tf.vz  = it->vz() ;
+         tf.vr  = sqrt( (it->vx()*it->vx()) + (it->vy()*it->vy()) ) ;
+
+         int ibin = (int)( ( it->dz() + 151.5 ) / 3.)  ; 
+         hTrk[ ibin ]++ ;
+    }
+}
+*/
+
 
 //define this as a plug-in
 DEFINE_FWK_MODULE(DPAnalysis);

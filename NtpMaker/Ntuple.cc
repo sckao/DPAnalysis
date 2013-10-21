@@ -20,8 +20,9 @@ void setBranchAddresses(TTree* chain, Ntuple& treeVars)
   chain -> SetBranchAddress("nGen",        &treeVars.nGen       );
   chain -> SetBranchAddress("nOutTimeHits",  &treeVars.nOutTimeHits );
   chain -> SetBranchAddress("nHaloTrack",    &treeVars.nHaloTrack );
-  chain -> SetBranchAddress("haloPhi",       &treeVars.haloPhi    );
-  chain -> SetBranchAddress("haloRho",       &treeVars.haloRho    );
+  //chain -> SetBranchAddress("haloPhi",       &treeVars.haloPhi    );
+  //chain -> SetBranchAddress("haloRho",       &treeVars.haloRho    );
+  chain -> SetBranchAddress("z0Ratio",       &treeVars.z0Ratio    );
 
   chain -> SetBranchAddress("met0Px",      &treeVars.met0Px     );
   chain -> SetBranchAddress("met0Py",      &treeVars.met0Py     );
@@ -51,14 +52,9 @@ void setBranchAddresses(TTree* chain, Ntuple& treeVars)
   chain -> SetBranchAddress("vtxNTracks", treeVars.vtxNTracks);
   chain -> SetBranchAddress("vtxChi2",    treeVars.vtxChi2   );
   chain -> SetBranchAddress("vtxNdof",    treeVars.vtxNdof   );
-  chain -> SetBranchAddress("vtxX",       treeVars.vtxX      );
-  chain -> SetBranchAddress("vtxY",       treeVars.vtxY      );
+  chain -> SetBranchAddress("vtxRhi",     treeVars.vtxRho     );
   chain -> SetBranchAddress("vtxZ",       treeVars.vtxZ      );
-  chain -> SetBranchAddress("vtxDx",      treeVars.vtxDx     );
-  chain -> SetBranchAddress("vtxDy",      treeVars.vtxDy     );
-  chain -> SetBranchAddress("vtxDz",      treeVars.vtxDz     );
-  chain -> SetBranchAddress("vtxHt",      treeVars.vtxHt     );
-  chain -> SetBranchAddress("nTrkZ0",     treeVars.nTrkZ0   );
+  //chain -> SetBranchAddress("nTrkZ0",     treeVars.nTrkZ0   );
 
   chain -> SetBranchAddress("muPx",        treeVars.muPx       );
   chain -> SetBranchAddress("muPy",        treeVars.muPy       );
@@ -164,8 +160,9 @@ void setBranches(TTree* chain, Ntuple& treeVars)
 
   chain -> Branch("nOutTimeHits",  &treeVars.nOutTimeHits, "nOutTimeHits/I" );
   chain -> Branch("nHaloTrack",    &treeVars.nHaloTrack,   "nHaloTrack/I" );
-  chain -> Branch("haloPhi",       &treeVars.haloPhi,      "haloPhi/F" );
-  chain -> Branch("haloRho",       &treeVars.haloRho,      "haloRho/F" );
+  //chain -> Branch("haloPhi",       &treeVars.haloPhi,      "haloPhi/F" );
+  //chain -> Branch("haloRho",       &treeVars.haloRho,      "haloRho/F" );
+  chain -> Branch("z0Ratio",     &treeVars.z0Ratio,        "z0Ratio/F" );
 
   chain -> Branch("met0Px",      &treeVars.met0Px,               "met0Px/F");
   chain -> Branch("met0Py",      &treeVars.met0Py,               "met0Py/F");
@@ -262,15 +259,9 @@ void setBranches(TTree* chain, Ntuple& treeVars)
   chain -> Branch("vtxNTracks",       treeVars.vtxNTracks,   "vtxNTracks[nVertices]/I");
   chain -> Branch("vtxChi2",          treeVars.vtxChi2,      "vtxChi2[nVertices]/F");
   chain -> Branch("vtxNdof",          treeVars.vtxNdof,      "vtxNdof[nVertices]/F");
-  chain -> Branch("vtxX",             treeVars.vtxX,         "vtxX[nVertices]/F");
-  chain -> Branch("vtxY",             treeVars.vtxY,         "vtxY[nVertices]/F");
+  chain -> Branch("vtxRho",           treeVars.vtxRho,       "vtxRho[nVertices]/F");
   chain -> Branch("vtxZ",             treeVars.vtxZ,         "vtxZ[nVertices]/F");
-  chain -> Branch("vtxDx",            treeVars.vtxDx,        "vtxDx[nVertices]/F");
-  chain -> Branch("vtxDy",            treeVars.vtxDy,        "vtxDy[nVertices]/F");
-  chain -> Branch("vtxDz",            treeVars.vtxDz,        "vtxDz[nVertices]/F");
-  chain -> Branch("vtxHt",            treeVars.vtxHt,        "vtxHt[nVertices]/F");
-
-  chain -> Branch("nTrkZ0",           treeVars.nTrkZ0,       "nTrkZ0[33]/I");
+  //chain -> Branch("nTrkZ0",           treeVars.nTrkZ0,       "nTrkZ0[33]/I");
   
   chain -> Branch("pdgId",        treeVars.pdgId,                 "pdgId[nGen]/I");
   chain -> Branch("momId",        treeVars.momId,                 "momId[nGen]/I");
@@ -307,8 +298,9 @@ void initializeBranches(TTree* chain, Ntuple& treeVars)
 
   treeVars.nOutTimeHits = -1 ;
   treeVars.nHaloTrack   = -1 ;
-  treeVars.haloPhi      = -1 ;
-  treeVars.haloRho      = -1 ;
+  //treeVars.haloPhi      = -1 ;
+  //treeVars.haloRho      = -1 ;
+  treeVars.z0Ratio    = -1 ;
 
   treeVars.met0Px = 0 ;
   treeVars.met0Py = 0 ;
@@ -411,17 +403,12 @@ void initializeBranches(TTree* chain, Ntuple& treeVars)
       treeVars.vtxNTracks[i]=0;
       treeVars.vtxChi2[i]=0;
       treeVars.vtxNdof[i]=0;
-      treeVars.vtxX[i]=0;
-      treeVars.vtxY[i]=0;
+      treeVars.vtxRho[i]=0;
       treeVars.vtxZ[i]=0;
-      treeVars.vtxDx[i]=0;
-      treeVars.vtxDy[i]=0;
-      treeVars.vtxDz[i]=0;
-      treeVars.vtxHt[i]=0;
   }
-  for(int i=0; i<33; i++) {
-      treeVars.nTrkZ0[i]=0;
-  }
+  //for(int i=0; i<33; i++) {
+  //    treeVars.nTrkZ0[i]=0;
+  //}
   for ( int i=0; i< MAXGEN; i++) {
       treeVars.pdgId[i] = 0 ;
       treeVars.momId[i] = 0 ;

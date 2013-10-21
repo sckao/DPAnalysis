@@ -3,7 +3,7 @@
 
 #include "TChain.h" 
 
-#define MAXVTX 10
+#define MAXVTX 30
 #define MAXJET 15
 #define MAXPHO 12
 #define MAXMU 5
@@ -23,26 +23,20 @@ struct Ntuple
 
   int nOutTimeHits ;
   int nHaloTrack ;
-  float haloPhi ;
-  float haloRho ;
-  
-  //int nTrksSmallBeta ;
-  //int nHaloSegs ;
+  //float haloPhi ;
+  //float haloRho ;
 
   // vertex variables
-  int   nVertices;
   int   totalNVtx ;
+  int   nVertices;
   float vtxNTracks[MAXVTX];
   float vtxChi2[MAXVTX];
   float vtxNdof[MAXVTX];
-  float vtxX[MAXVTX];
-  float vtxDx[MAXVTX];
-  float vtxY[MAXVTX];
-  float vtxDy[MAXVTX];
+  float vtxRho[MAXVTX];
   float vtxZ[MAXVTX];
-  float vtxDz[MAXVTX];
-  float vtxHt[MAXVTX];
-  int   nTrkZ0[33];
+
+  float z0Ratio;
+  //int   nTrkZ0[33];
   
   // reco variables
   int   nJets ;

@@ -424,14 +424,14 @@ void DPAnalysis::CSCHaloCleaning( const edm::Event& iEvent, vector<const reco::P
       leaves.nOutTimeHits = nOutTimeHits ;
       leaves.nHaloTrack   = nMinusHTrks + nPlusHTrks ;
 
-      std::vector<GlobalPoint> gp = cscData.GetCSCTrackImpactPositions() ;
+      //std::vector<GlobalPoint> gp = cscData.GetCSCTrackImpactPositions() ;
       //cout<<" impact gp sz : "<< gp.size() <<" photon sz:"<< selectedPhotons.size() << endl ;
 
-      for (vector<GlobalPoint>::const_iterator it = gp.begin(); it != gp.end() ; ++it ) {
-          double rho = sqrt(  (it->x()*it->x()) + (it->y()*it->y()) );
+      //for (vector<GlobalPoint>::const_iterator it = gp.begin(); it != gp.end() ; ++it ) {
+      //    double rho = sqrt(  (it->x()*it->x()) + (it->y()*it->y()) );
           //cout<<"    ==>  phi:"<<  it->phi() <<" rho: "<< rho << " z: "<< it->z() <<endl ;
-          leaves.haloPhi = it->phi() ;
-          leaves.haloRho = rho ;
+      //    leaves.haloPhi = it->phi() ;
+      //    leaves.haloRho = rho ;
  
           /*
           for ( size_t i=0; i< selectedPhotons.size() ; i++ ) { 
@@ -442,7 +442,7 @@ void DPAnalysis::CSCHaloCleaning( const edm::Event& iEvent, vector<const reco::P
               cout<<"    ("<< i << ") ==> dPhi : "<< dPhi <<" dRho : "<< dRho << endl ;
           }
           */
-      }
+      //}
    }
 
 }
@@ -607,6 +607,8 @@ void DPAnalysis::PrintTriggers( const edm::Event& iEvent ) {
 void DPAnalysis::Track_Z0( Handle<reco::TrackCollection> tracks ) {
 
     //vector<TrkInfo> trkColl ;
+    double in_trk = 0 ;
+    double out_trk = 0 ;
     for (reco::TrackCollection::const_iterator it = tracks->begin(); it != tracks->end(); it++ )  {
         if ( fabs(it->d0()) >= vtxCuts[2] ) continue ;
          /*
@@ -620,22 +622,16 @@ void DPAnalysis::Track_Z0( Handle<reco::TrackCollection> tracks ) {
          trkColl.push_back(tf) ;
          */
          h_z0->Fill( it->dz() ) ;
-
+         if ( fabs( it->dz() ) < 20. )  in_trk += 1. ;
+         else                          out_trk += 1. ;
          /*
-         int ibin = 0 ; 
-         if ( it->dz()  < -125. )                  ibin = 1  ;
-         if ( it->dz() >= -125 && it->dz() < -25 ) ibin = (int)( ( it->dz() + 125. ) / 10. ) + 2 ;
-         if ( it->dz() >=  -25 && it->dz() <  25 ) ibin = (int)( ( it->dz() +  25. ) /  5. ) + 12 ;
-         if ( it->dz() >=   25 && it->dz() < 125 ) ibin = (int)( ( it->dz() -  25. ) / 10. ) + 22 ;
-         if ( it->dz()  >  125. )                  ibin = 32 ;
-         */
          int ibin = (int)( (it->dz() + 155. ) / 10.) + 1;
          if ( it->dz() < -155. ) ibin = 0 ;
-         if ( it->dz() >  155. ) ibin = 33 ;
-
+         if ( it->dz() >  155. ) ibin = 32 ;
          leaves.nTrkZ0[ ibin ] += 1 ;
+         */
     }
-
+    leaves.z0Ratio = ( in_trk > 0. ) ? (out_trk / in_trk) : -1 ;
     /*
     sort( trkColl.begin(), trkColl.end(), Z0Decreasing ) ;
     
@@ -672,88 +668,45 @@ bool DPAnalysis::VertexSelection( Handle<reco::VertexCollection> vtx ) {
 
     bool hasGoodVertex = true ;
     int totalN_vtx = 0 ;
-    vector<VtxInfo> vtxColl ;
-    //printf("************************************ \n") ;
-    // 1. Select tracks and vertices, sort vertices in their z positions
+    int i = 0 ;
     for (reco::VertexCollection::const_iterator v=vtx->begin();  v!=vtx->end() ; v++){
 
         if ( ! v->isValid() ||  v->isFake() ) continue ;
 
         //printf("@@  N of trk: %d , ndof: %.1f", (int)v->tracksSize(), v->ndof() ) ;
         int ntrk = 0;
-        double ht = 0 ;
+        //double ht = 0 ;
         for (reco::Vertex::trackRef_iterator itrk = v->tracks_begin(); itrk != v->tracks_end(); ++itrk) {
             double d0 = (*itrk)->d0() ;
             //double z0 = (*itrk)->dz() ;
             //double sz = (*itrk)->dsz() ;
             //printf("*   d0: %f , z0: %f , sz: %f \n", d0, z0 , sz ) ;
             if ( d0 >= vtxCuts[2] ) continue ;
-            ht += (*itrk)->pt() ;
+            //ht += (*itrk)->pt() ;
             ntrk++ ;
         }
         //printf(" N of trk: %d , ht: %f, vtx_z: %f \n", ntrk, ht, v->z() ) ;
 
         //if ( fabs(v->z()) >= vtxCuts[0] ) continue ; 
         if (   v->ndof()   < vtxCuts[1] ) continue ;
+
         // counting real number of vertices
         totalN_vtx++ ;
 
-        VtxInfo vi ;
-        vi.nTracks = ntrk ;
-        vi.ndof = v->ndof() ;
-        vi.chi2 = v->normalizedChi2() ;
-        vi.ht   = ht ; 
-        vi.x    = v->x() ;
-        vi.y    = v->y() ;
-        vi.z    = v->z() ;
-        vi.dx   = v->xError() ;
-        vi.dy   = v->yError() ;
-        vi.dz   = v->zError() ;
-        vtxColl.push_back( vi ) ;
-     }
-     sort( vtxColl.begin(), vtxColl.end(), ZDecreasing ) ;
-
-     vector<VtxInfo> selVtx ;
-     double dz = 99. ;
-     //printf(" ^^^^^^^^^^^^ \n") ;
-     for ( size_t i=0; i< vtxColl.size() ; i++ ) {
-         //printf("**  Z = %f, N of trk: %d , ndof: %.1f , ht: %f , sz:%d \n", 
-         //        vtxColl[i].z, vtxColl[i].nTracks, vtxColl[i].ndof, vtxColl[i].ht, (int) selVtx.size() ) ;
-
-         dz = ( i > 0 ) ? fabs( vtxColl[i].z - selVtx[ selVtx.size()-1 ].z ) : 99. ;
-         if ( dz > 1. ) {
-            selVtx.push_back( vtxColl[i] ) ;
-         } else  {
-            if (  vtxColl[i].ht > selVtx[ selVtx.size()-1].ht ) {
-               selVtx.erase( selVtx.end() - 1 );
-               selVtx.push_back( vtxColl[i] ) ;
-            }
-         } 
+        if ( i >= MAXVTX ) continue ;
+	leaves.vtxNTracks[i] = ntrk ;
+	leaves.vtxChi2[i]    = v->normalizedChi2()  ;
+	leaves.vtxNdof[i]    = v->ndof()   ;
+	leaves.vtxRho[i]     = sqrt( ( v->y()*v->y() ) + ( v->x()*v->x() ) );
+	leaves.vtxZ[i]       = v->z()  ;
+        i++ ;
 
      }
-     sort( selVtx.begin(), selVtx.end(), HtDecreasing ) ;
 
-     //printf(" ----------- \n") ;
-     for ( size_t i=0; i< selVtx.size() ; i++ ) {
-         //printf("==  Z = %f, N of trk: %d , ndof: %.1f , ht: %f \n", 
-         //        selVtx[i].z, selVtx[i].nTracks, selVtx[i].ndof, selVtx[i].ht ) ;
-
-         if ( i >= MAXVTX ) continue ;
-         leaves.vtxNTracks[i]= selVtx[i].nTracks;
-	 leaves.vtxChi2[i] =   selVtx[i].chi2   ;
-	 leaves.vtxNdof[i] =   selVtx[i].ndof   ;
-	 leaves.vtxX[i] =      selVtx[i].x  ;
-	 leaves.vtxY[i] =      selVtx[i].y  ;
-	 leaves.vtxZ[i] =      selVtx[i].z  ;
-	 leaves.vtxDx[i] =     selVtx[i].dx ;
-	 leaves.vtxDy[i] =     selVtx[i].dy ;
-	 leaves.vtxDz[i] =     selVtx[i].dz ;
-         leaves.vtxHt[i] =     selVtx[i].ht ;
-     }
-     leaves.nVertices = ( selVtx.size() > 10 ) ? 10 :  (int) selVtx.size() ;
+     leaves.nVertices = i ;
      leaves.totalNVtx = totalN_vtx ;
  
-     if ( vtxColl.size() < 1 )   hasGoodVertex = false ;
+     if ( i < 1 )   hasGoodVertex = false ;
      return hasGoodVertex ;
 }
 

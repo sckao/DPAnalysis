@@ -3,6 +3,7 @@
 
 #include "TChain.h" 
 
+#define MAXDT 10
 #define MAXVTX 30
 #define MAXJET 15
 #define MAXPHO 12
@@ -150,6 +151,62 @@ struct Ntuple
   float genT[MAXGEN] ; 
 
 };
+
+
+struct Ctuple
+{
+  
+  unsigned int runId;
+  unsigned int eventId;
+  int triggered ;
+  int L1a;  
+  int nSC ;
+  int nDT ;
+  int nCSC ;
+
+  float dtdEta[MAXPHO] ;
+  float dtdPhi[MAXPHO] ;
+  float cscdPhi[MAXPHO] ;
+  float cscRho[MAXPHO] ;
+
+  float xtalEta[MAXPHO] ;
+  float xtalPhi[MAXPHO] ;
+  float xtalE[MAXPHO] ;
+  float xtalSigma[MAXPHO] ;
+  float xtalSwissX[MAXPHO] ;
+  float xtalChi2[MAXPHO] ;
+  float xtal_x[MAXPHO] ;
+  float xtal_y[MAXPHO] ;
+  float xtal_z[MAXPHO] ;
+  float xtal_t[MAXPHO] ;
+  float bc_sMaj[MAXPHO] ;
+  float bc_sMin[MAXPHO] ;
+  float bc_E[MAXPHO] ;
+  int bc_nXtals[MAXPHO] ;
+  int bc_nBC[MAXPHO] ;
+
+  float cscX[MAXDT] ;
+  float cscY[MAXDT] ;
+  float cscZ[MAXDT] ;
+  int   cscL[MAXDT] ;
+  float cscdX[MAXDT] ;
+  float cscdY[MAXDT] ;
+  float cscdZ[MAXDT] ;
+
+  float dtX[MAXDT] ;
+  float dtY[MAXDT] ;
+  float dtZ[MAXDT] ;
+  int   dtL[MAXDT] ;
+  float dtdX[MAXDT] ;
+  float dtdY[MAXDT] ;
+  float dtdZ[MAXDT] ;
+
+  float met ;
+  float metPx ;
+  float metPy ;
+
+} ;
+
 
 // ------------------------------------------------------------------------
 //! branch addresses settings

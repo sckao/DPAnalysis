@@ -281,6 +281,7 @@ class DPAnalysis : public edm::EDAnalyzer {
       string rootFileName;
       std::vector<string> triggerPatent ;
       bool isData ;
+      bool useRECO ;
       bool L1Select ;
       string l1GTSource ;
       double tau ;

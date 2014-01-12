@@ -44,9 +44,9 @@ using namespace cms ;
 using namespace edm ;
 using namespace std ;
 
-static bool HtDecreasing( VtxInfo s1, VtxInfo s2) { return ( s1.ht > s2.ht ); }
-static bool ZDecreasing( VtxInfo s1, VtxInfo s2) { return ( s1.z > s2.z ); }
-static bool Z0Decreasing( TrkInfo s1, TrkInfo s2) { return ( s1.dz > s2.dz ); }
+//static bool HtDecreasing( VtxInfo s1, VtxInfo s2) { return ( s1.ht > s2.ht ); }
+//static bool ZDecreasing( VtxInfo s1, VtxInfo s2) { return ( s1.z > s2.z ); }
+//static bool Z0Decreasing( TrkInfo s1, TrkInfo s2) { return ( s1.dz > s2.dz ); }
 
 // constants, enums and typedefs
 // static data member definitions
@@ -88,6 +88,7 @@ DPAnalysis::DPAnalysis(const edm::ParameterSet& iConfig){
    triggerPatent        = iConfig.getParameter< std::vector<string> >("triggerName");
    L1Select             = iConfig.getParameter<bool> ("L1Select");
    isData               = iConfig.getParameter<bool> ("isData");
+   useRECO              = iConfig.getParameter<bool> ("useRECO");
    tau                  = iConfig.getParameter<double> ("tau");
 
    const InputTag TrigEvtTag("hltTriggerSummaryAOD","","HLT");
@@ -275,14 +276,10 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent, const edm::EventSetup&
    bool passEvent = true ;
 
    // find trigger matched objects
-   //cout<<" ~~~~~~~~~~~~~~~~~ "<<endl ;
    const reco::Photon rPho ;
    GetTrgMatchObject(  rPho , iEvent,  photonSource ) ;
-   //cout<<" ----------------- "<<endl ;
    const reco::PFMET pfMet_ = (*met)[0] ;
    GetTrgMatchObject( pfMet_, iEvent,  metSource ) ;
-   //cout<<" ================= "<<endl ;
-   //cout<<" "<<endl ;
 
    Track_Z0( tracks ) ;
 
@@ -323,13 +320,15 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent, const edm::EventSetup&
    CSCHaloCleaning( iEvent, selectedPhotons ) ;
 
    // for cscsegments and halo muon/photon studies 
-   Handle<CSCSegmentCollection>       cscSegments ;
-   iEvent.getByLabel( CSCSegmentTag,  cscSegments );
-   BeamHaloMatch( cscSegments, selectedPhotons, iSetup ) ;
-   
-   Handle<DTRecSegment4DCollection>   dtSegments ;
-   iEvent.getByLabel( DTSegmentTag,   dtSegments );
-   CosmicRayMatch( dtSegments, selectedPhotons, iSetup ) ;
+   if ( useRECO ) { 
+      Handle<CSCSegmentCollection>       cscSegments ;
+      iEvent.getByLabel( CSCSegmentTag,  cscSegments );
+      BeamHaloMatch( cscSegments, selectedPhotons, iSetup ) ;
+
+      Handle<DTRecSegment4DCollection>   dtSegments ;
+      iEvent.getByLabel( DTSegmentTag,   dtSegments );
+      CosmicRayMatch( dtSegments, selectedPhotons, iSetup ) ;
+   }
    //CosmicRayMatch( muons, selectedPhotons ) ;
    
    //Handle< edm::OwnVector<TrackingRecHit> >  mu_rhits ;
@@ -370,6 +369,7 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent, const edm::EventSetup&
 
    return passEvent ;
 }
+
 
 bool DPAnalysis::L1TriggerSelection( const edm::Event& iEvent, const edm::EventSetup& iSetup ) {
 
@@ -757,7 +757,7 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
        float seedTime    = (float)seedRH->time();
        float seedTimeErr = (float)seedRH->timeError();
        float swissX = EcalTools::swissCross( seedCrystalId, *rechits , 0., true ) ;
-
+       float seedE       = seedRH->energy() ;
        // sMin and sMaj cuts
        if ( sMaj  > photonCuts[2] ) continue ;
        gcounter[4]++ ;
@@ -809,7 +809,6 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
        phoTmp.nchi2  = 0 ;
        phoTmp.nxtals = 0 ;
        phoTmp.nBC    = 0 ;
-       phoTmp.fSpike = -1 ;
        phoTmp.maxSX  = -1 ;
        //cout<<" 1st xT : "<< aveXtalTime <<"  xTE : "<< aveXtalTimeErr << endl;
        // Only use the seed cluster
@@ -822,7 +821,6 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
        leaves.timeChi2[k]     = phoTmp.nchi2 ;
        leaves.nXtals[k]       = phoTmp.nxtals ;
        leaves.nBC[k]          = phoTmp.nBC ;
-       leaves.fSpike[k]       = phoTmp.fSpike ;
        leaves.maxSwissX[k]    = phoTmp.maxSX ; 
        leaves.seedSwissX[k]   = swissX ;
  
@@ -1109,8 +1107,8 @@ bool DPAnalysis::BeamHaloMatch( Handle<CSCSegmentCollection> cscSeg, vector<cons
 	   double rho = sqrt( (gp.x()*gp.x()) + (gp.y()*gp.y()) ) ;
            if ( fabs(dPhi_) < dPhi ) {
               dPhi = fabs( dPhi_ ) ;
-              cscRho = rho ;
-              cscTime   = it->time() ;
+              cscRho  = rho ;
+              cscTime = it->time() ;
            }
        }
        if ( dPhi < 0.1 )  halomatch = true ;
@@ -1199,8 +1197,6 @@ void DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitColl
   double maxSwissX = 0 ;
   int    nBC      = 0 ;
   int    nXtl     = 0 ;
-  int    nSpike   = 0 ; 
-  int    nSeedXtl = 0 ;
   for ( reco::CaloCluster_iterator  clus = scRef->clustersBegin() ;  clus != scRef->clustersEnd();  ++clus) {
 
       nBC++ ;
@@ -1240,8 +1236,6 @@ void DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitColl
              float swissX = (isEB) ? EcalTools::swissCross(detitr->first, *recHitsEB , 0., true ) : 
                                      EcalTools::swissCross(detitr->first, *recHitsEE , 0., true ) ;
              maxSwissX = ( isSeed && swissX  > maxSwissX ) ? swissX : maxSwissX ;
-             if ( gotSpike && isSeed ) nSpike++  ;
-             if ( isSeed             ) nSeedXtl++  ;
 
              // thisamp is the EB amplitude of the current rechit
              double thisamp  = myhit.energy () ;
@@ -1282,12 +1276,10 @@ void DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitColl
       }
   }
   if ( debugT ) printf("--- sum_chi2: %.2f, ndof: %.1f norm_chi2: %.2f ---\n", chi2_bc, ndof, chi2_bc/ndof );
-  //cout<<" nSpike = "<<  nSpike <<" nXtl = "<< nSeedXtl <<"  maxSwissX = "<< maxSwissX  << endl ;
   // update ave. time and error
   phoTmp.t     = xtime / xtimeErr ;
   phoTmp.dt    = 1. / sqrt( xtimeErr) ;
   phoTmp.nchi2 = ( ndof != 0 ) ? chi2_bc / ndof : 9999999 ;     
-  phoTmp.fSpike = ( nSeedXtl > 0 ) ? (nSpike*1.) / (nSeedXtl*1.) : -1 ;
   phoTmp.nxtals = nXtl ;
   phoTmp.nBC    = nBC ;
   phoTmp.maxSX  = maxSwissX ;

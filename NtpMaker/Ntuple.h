@@ -3,13 +3,17 @@
 
 #include "TChain.h" 
 
-#define MAXDT 10
-#define MAXVTX 30
+#define MAXVTX 10
 #define MAXJET 15
 #define MAXPHO 12
 #define MAXMU 5
 #define MAXELE 5
 #define MAXGEN 20
+
+#define MAXDT  15
+#define MAXCSC 15
+#define MAXSC  15
+#define MAXCMU 10
 
 struct Ntuple
 {
@@ -53,6 +57,9 @@ struct Ntuple
   float jetNEF[MAXJET];
   float jecUnc[MAXJET];
   float jerUnc[MAXJET];
+  float jetTime[MAXJET] ;
+  float jetTimeErr[MAXJET] ;
+  float jetSCE[MAXJET] ;
   //float jecUncU[MAXJET];
   //float jecUncD[MAXJET];
   
@@ -122,8 +129,7 @@ struct Ntuple
   float aveTimeErr[MAXPHO];
   float aveTimeErr1[MAXPHO];
   float timeChi2[MAXPHO] ;
-  float fSpike[MAXPHO] ;
-  float maxSwissX[MAXPHO] ;
+  float seedE[MAXPHO] ;
   float seedSwissX[MAXPHO] ;
   float sigmaEta[MAXPHO] ;
   float sigmaIeta[MAXPHO] ;
@@ -160,51 +166,55 @@ struct Ctuple
   unsigned int eventId;
   int triggered ;
   int L1a;  
-  int nSC ;
-  int nDT ;
-  int nCSC ;
+  int nSC, nDT, nCSC, nMuons ;
 
-  float dtdEta[MAXPHO] ;
-  float dtdPhi[MAXPHO] ;
-  float cscdPhi[MAXPHO] ;
-  float cscRho[MAXPHO] ;
+  float met, metPx, metPy ;
 
-  float xtalEta[MAXPHO] ;
-  float xtalPhi[MAXPHO] ;
-  float xtalE[MAXPHO] ;
-  float xtalSigma[MAXPHO] ;
-  float xtalSwissX[MAXPHO] ;
-  float xtalChi2[MAXPHO] ;
-  float xtal_x[MAXPHO] ;
-  float xtal_y[MAXPHO] ;
-  float xtal_z[MAXPHO] ;
-  float xtal_t[MAXPHO] ;
-  float bc_sMaj[MAXPHO] ;
-  float bc_sMin[MAXPHO] ;
-  float bc_E[MAXPHO] ;
-  int bc_nXtals[MAXPHO] ;
-  int bc_nBC[MAXPHO] ;
+  float cscRho[MAXSC] ;
+  float cscdPhi[MAXSC] ;
+  float dtdEta[MAXSC] ;
+  float dtdPhi[MAXSC] ;
 
-  float cscX[MAXDT] ;
-  float cscY[MAXDT] ;
-  float cscZ[MAXDT] ;
-  int   cscL[MAXDT] ;
-  float cscdX[MAXDT] ;
-  float cscdY[MAXDT] ;
-  float cscdZ[MAXDT] ;
+  float xtalEta[MAXSC] ;
+  float xtalPhi[MAXSC] ;
+  float xtalE[MAXSC] ;
+  float xtalSigma[MAXSC] ;
+  float xtalSwissX[MAXSC] ;
+  float xtalChi2[MAXSC] ;
+  float xtal_x[MAXSC] ;
+  float xtal_y[MAXSC] ;
+  float xtal_z[MAXSC] ;
+  float xtal_t[MAXSC] ;
+
+  float bc_sMaj[MAXSC] ;
+  float bc_sMin[MAXSC] ;
+  float bc_E[MAXSC] ;
+  int   bc_nXtals[MAXSC] ;
+  int   bc_nBC[MAXSC] ;
+
+  float cscX[MAXCSC] ;
+  float cscY[MAXCSC] ;
+  float cscZ[MAXCSC] ;
+  float cscdX[MAXCSC] ;
+  float cscdY[MAXCSC] ;
+  float cscdZ[MAXCSC] ;
+  float csc_dPhi[MAXCSC] ;
 
   float dtX[MAXDT] ;
   float dtY[MAXDT] ;
   float dtZ[MAXDT] ;
-  int   dtL[MAXDT] ;
   float dtdX[MAXDT] ;
   float dtdY[MAXDT] ;
   float dtdZ[MAXDT] ;
+  float dt_dR[MAXDT] ;
 
-  float met ;
-  float metPx ;
-  float metPy ;
-
+  int   mu_nDT[MAXCMU] ;
+  int   mu_nCSC[MAXCMU] ;
+  float muPx[MAXCMU];
+  float muPy[MAXCMU];
+  float muPz[MAXCMU];
+  float muE[MAXCMU];
+ 
 } ;
 
 
@@ -218,6 +228,7 @@ void setBranches(TTree* chain, Ntuple& treeVars);
 //! initialize branches
 void initializeBranches(TTree* chain, Ntuple& treeVars);
 
+void setCosmicBranches( TTree* chain, Ctuple& treeVars) ;
 
 
 #endif

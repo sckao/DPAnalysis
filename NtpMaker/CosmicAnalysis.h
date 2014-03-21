@@ -78,7 +78,6 @@
 #include "DataFormats/CSCRecHit/interface/CSCSegmentCollection.h"
 #include "Geometry/Records/interface/MuonGeometryRecord.h"
 #include "DataFormats/METReco/interface/CSCHaloData.h"
-
 // For DT Segment
 #include "DataFormats/DTRecHit/interface/DTRecSegment4DCollection.h"
 
@@ -86,11 +85,9 @@
 #include "Geometry/CaloGeometry/interface/CaloGeometry.h"
 #include "Geometry/Records/interface/CaloGeometryRecord.h"
 #include "RecoEcal/EgammaCoreTools/interface/EcalTools.h"
-
 #include "RecoEgamma/EgammaTools/interface/ConversionTools.h"
 
 #include <algorithm>
-
 
 #include <TMath.h>
 #include "TFile.h"
@@ -135,6 +132,8 @@ struct iDT {
         float dx ;
         float dy ;
         float dz ;
+        float dR ;
+        float dPhi ;
 } ;
 
 class CosmicAnalysis : public edm::EDAnalyzer {
@@ -162,6 +161,8 @@ class CosmicAnalysis : public edm::EDAnalyzer {
 
       void ClusterInfo( edm::Handle<reco::SuperClusterCollection> scCollection, edm::Handle<EcalRecHitCollection> recHitsEB, edm::Handle<EcalRecHitCollection> recHitsEE, vector<iCluster>& scV ) ;
 
+      void MuonSelection( edm::Handle<reco::MuonCollection> muons ) ;
+
       void InitializeCosmicBranches() ;
 
    private:
@@ -179,9 +180,9 @@ class CosmicAnalysis : public edm::EDAnalyzer {
       edm::InputTag trigSource;
       edm::InputTag trigEvent;
       edm::InputTag muonSource;
-      edm::InputTag photonSource;
       edm::InputTag metSource;
-      edm::InputTag jetSource;
+      //edm::InputTag photonSource;
+      //edm::InputTag jetSource;
 
       edm::InputTag bcSource;
       edm::InputTag scSource;
@@ -189,7 +190,6 @@ class CosmicAnalysis : public edm::EDAnalyzer {
       edm::InputTag EERecHitCollection;
       edm::InputTag DTSegmentTag ;
       edm::InputTag CSCSegmentTag ;
-      edm::InputTag staMuons ;
 
       //edm::InputTag pileupSource ;
       edm::ESHandle<EcalIntercalibConstants> ical;
@@ -199,10 +199,6 @@ class CosmicAnalysis : public edm::EDAnalyzer {
       const CaloGeometry * theGeometry ;
       //edm::ESHandle<GlobalTrackingGeometry> trackingGeometry;
 
-      std::vector<double> muonCuts ;
-      std::vector<double> photonCuts ;
-      std::vector<double> metCuts ;
-      std::vector<double> jetCuts ; 
 
       //std::vector<const reco::Muon*> selectedMuons ;
 
@@ -211,7 +207,7 @@ class CosmicAnalysis : public edm::EDAnalyzer {
 
 //      timeCorrector theTimeCorrector_;
       edm::Timestamp eventTime ;
-
+      std::vector<double> muonCuts ;
       std::vector<int> firedTrig ;
       int targetTrig ;
       //std::vector<int> firedTrigID ;

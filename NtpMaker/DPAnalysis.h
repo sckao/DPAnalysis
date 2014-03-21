@@ -106,8 +106,8 @@
 #include "DataFormats/Common/interface/OwnVector.h"
 
 // Calibration services
-//#include "Geometry/CaloGeometry/interface/CaloGeometry.h"
-//#include "Geometry/Records/interface/CaloGeometryRecord.h"
+#include "Geometry/CaloGeometry/interface/CaloGeometry.h"
+#include "Geometry/Records/interface/CaloGeometryRecord.h"
 
 //#include "CondFormats/EcalObjects/interface/EcalIntercalibConstants.h"
 //#include "CondFormats/DataRecord/interface/EcalIntercalibConstantsRcd.h"
@@ -139,8 +139,8 @@
 #include <algorithm>
 
 // global tracking geometry
-//#include "Geometry/Records/interface/GlobalTrackingGeometryRecord.h"
-//#include "Geometry/CommonDetUnit/interface/GlobalTrackingGeometry.h"
+#include "Geometry/Records/interface/GlobalTrackingGeometryRecord.h"
+#include "Geometry/CommonDetUnit/interface/GlobalTrackingGeometry.h"
 
 // PU SummeryInfo
 //#include "SimDataFormats/PileupSummaryInfo/interface/PileupSummaryInfo.h" 
@@ -228,9 +228,8 @@ class DPAnalysis : public edm::EDAnalyzer {
 
       bool PhotonSelection(  edm::Handle<reco::PhotonCollection> photons, edm::Handle<EcalRecHitCollection> recHitsEB, edm::Handle<EcalRecHitCollection> recHitsEE, edm::Handle<reco::TrackCollection> tracks, vector<const reco::Photon*>& selectedPhotons ) ;
 
-      pair<double,double> ClusterTime( reco::SuperClusterRef scRef, edm::Handle<EcalRecHitCollection> recHitsEB, edm::Handle<EcalRecHitCollection> recHitsEE ) ;
-      void ClusterTime( reco::SuperClusterRef scRef, edm::Handle<EcalRecHitCollection> recHitsEB, edm::Handle<EcalRecHitCollection> recHitsEE, PhoInfo& phoTmp, bool useAllClusters = false ) ;
-      //void ClusterTime( reco::SuperClusterRef scRef, edm::Handle<EcalRecHitCollection> recHitsEB, edm::Handle<EcalRecHitCollection> recHitsEE, double& aveTime, double& aveTimeErr, double& nChi2, bool useAllClusters = false ) ;
+      pair<double,double> ClusterTime( reco::SuperClusterRef scRef, edm::Handle<EcalRecHitCollection> recHitsEB, edm::Handle<EcalRecHitCollection> recHitsEE, float EtCuts= 3., bool useAllClusters = false ) ;
+      void ClusterTime( reco::SuperClusterRef scRef, edm::Handle<EcalRecHitCollection> recHitsEB, edm::Handle<EcalRecHitCollection> recHitsEE, PhoInfo& phoTmp, float EtCuts= 3., bool useAllClusters = false ) ;
 
       //double HLTMET( edm::Handle<reco::PFJetCollection> jets, vector<const reco::Muon*>& selectedMuons, bool addMuon = false ) ;
 
@@ -239,6 +238,11 @@ class DPAnalysis : public edm::EDAnalyzer {
 
       bool JetSelection( edm::Handle<std::vector<pat::Jet> > patjets, vector<const reco::Photon*>& selectedPhotons, 
                             vector< pat_Jet* >& selectedJets_ ) ;
+
+      bool JetSelection( edm::Handle<std::vector<pat::Jet> > patjets, vector<const reco::Photon*>& selectedPhotons, 
+                         edm::Handle<reco::SuperClusterCollection> scEB, edm::Handle<reco::SuperClusterCollection> scEE,
+                         edm::Handle<EcalRecHitCollection> recHitsEB, edm::Handle<EcalRecHitCollection> recHitsEE,
+                         vector< pat_Jet* >& selectedJets_ ) ;
 
       vector<double> JECUncertainty( double jetpt, double jeteta, JetCorrectionUncertainty* unc ) ;
       vector<double> JECUncertainty( double jetpt, double jeteta ) ;
@@ -257,8 +261,6 @@ class DPAnalysis : public edm::EDAnalyzer {
       bool GammaJetVeto( vector<const reco::Photon*>& selectedPhotons, vector<const reco::PFJet*>& selectedJets) ;
 
       bool BeamHaloMatch( edm::Handle<CSCSegmentCollection> cscSeg, vector<const reco::Photon*>& selectedPhotons, const edm::EventSetup& iSetup ) ;
-      bool BeamHaloMatch( edm::OwnVector<TrackingRecHit> rhits, vector<const reco::Photon*>& selectedPhotons, const edm::EventSetup& iSetup ) ;
-      bool CosmicRayMatch( edm::Handle<reco::MuonCollection> muons, vector<const reco::Photon*>& selectedPhotons ) ;
 
       bool CosmicRayMatch( edm::Handle<DTRecSegment4DCollection> dtSeg, vector<const reco::Photon*>& selectedPhotons, const EventSetup& iSetup );
 
@@ -281,6 +283,7 @@ class DPAnalysis : public edm::EDAnalyzer {
       string rootFileName;
       std::vector<string> triggerPatent ;
       bool isData ;
+      bool useRECO ;
       bool L1Select ;
       string l1GTSource ;
       double tau ;
@@ -300,6 +303,8 @@ class DPAnalysis : public edm::EDAnalyzer {
 
       edm::InputTag EBRecHitCollection;
       edm::InputTag EERecHitCollection;
+      edm::InputTag EBSuperClusterCollection ;
+      edm::InputTag EESuperClusterCollection ;
       edm::InputTag DTSegmentTag ;
       edm::InputTag CSCSegmentTag ;
       edm::InputTag cscHaloTag ;

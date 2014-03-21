@@ -44,9 +44,9 @@ using namespace cms ;
 using namespace edm ;
 using namespace std ;
 
-static bool HtDecreasing( VtxInfo s1, VtxInfo s2) { return ( s1.ht > s2.ht ); }
-static bool ZDecreasing( VtxInfo s1, VtxInfo s2) { return ( s1.z > s2.z ); }
-static bool Z0Decreasing( TrkInfo s1, TrkInfo s2) { return ( s1.dz > s2.dz ); }
+//static bool HtDecreasing( VtxInfo s1, VtxInfo s2) { return ( s1.ht > s2.ht ); }
+//static bool ZDecreasing( VtxInfo s1, VtxInfo s2) { return ( s1.z > s2.z ); }
+//static bool Z0Decreasing( TrkInfo s1, TrkInfo s2) { return ( s1.dz > s2.dz ); }
 
 // constants, enums and typedefs
 // static data member definitions
@@ -75,6 +75,8 @@ DPAnalysis::DPAnalysis(const edm::ParameterSet& iConfig){
    CSCSegmentTag        = iConfig.getParameter<edm::InputTag> ("CSCSegmentCollection") ;
    cscHaloTag           = iConfig.getParameter<edm::InputTag> ("cscHaloData");
    staMuons             = iConfig.getParameter<edm::InputTag> ("staMuons");
+   EBSuperClusterCollection = iConfig.getParameter<edm::InputTag> ("EBSuperClusterCollection") ;
+   EESuperClusterCollection = iConfig.getParameter<edm::InputTag> ("EESuperClusterCollection") ;
 
    //pileupSource         = iConfig.getParameter<edm::InputTag>("addPileupInfo");
    vtxCuts              = iConfig.getParameter<std::vector<double> >("vtxCuts");
@@ -88,6 +90,7 @@ DPAnalysis::DPAnalysis(const edm::ParameterSet& iConfig){
    triggerPatent        = iConfig.getParameter< std::vector<string> >("triggerName");
    L1Select             = iConfig.getParameter<bool> ("L1Select");
    isData               = iConfig.getParameter<bool> ("isData");
+   useRECO              = iConfig.getParameter<bool> ("useRECO");
    tau                  = iConfig.getParameter<double> ("tau");
 
    const InputTag TrigEvtTag("hltTriggerSummaryAOD","","HLT");
@@ -256,6 +259,8 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent, const edm::EventSetup&
    Handle<EcalRecHitCollection>        recHitsEE ;
    Handle<reco::TrackCollection>       tracks; 
    Handle<reco::PFCandidateCollection>           pfCand ;
+   Handle<reco::SuperClusterCollection>  scEB ;
+   Handle<reco::SuperClusterCollection>  scEE ;
 
    iEvent.getByLabel( trigSource,     triggers );
    iEvent.getByLabel( pvSource,       recVtxs  );
@@ -268,6 +273,8 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent, const edm::EventSetup&
    iEvent.getByLabel( type1metSource, met  );
    iEvent.getByLabel( EBRecHitCollection,     recHitsEB );
    iEvent.getByLabel( EERecHitCollection,     recHitsEE );
+   iEvent.getByLabel( EBSuperClusterCollection , scEB) ;
+   iEvent.getByLabel( EESuperClusterCollection , scEE) ;
    iEvent.getByLabel("BeamHaloSummary", beamHaloSummary) ;
    iEvent.getByLabel( trackSource,    tracks  );
    iEvent.getByLabel( "particleFlow", pfCand ) ;
@@ -275,14 +282,10 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent, const edm::EventSetup&
    bool passEvent = true ;
 
    // find trigger matched objects
-   //cout<<" ~~~~~~~~~~~~~~~~~ "<<endl ;
    const reco::Photon rPho ;
    GetTrgMatchObject(  rPho , iEvent,  photonSource ) ;
-   //cout<<" ----------------- "<<endl ;
    const reco::PFMET pfMet_ = (*met)[0] ;
    GetTrgMatchObject( pfMet_, iEvent,  metSource ) ;
-   //cout<<" ================= "<<endl ;
-   //cout<<" "<<endl ;
 
    Track_Z0( tracks ) ;
 
@@ -323,25 +326,23 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent, const edm::EventSetup&
    CSCHaloCleaning( iEvent, selectedPhotons ) ;
 
    // for cscsegments and halo muon/photon studies 
-   Handle<CSCSegmentCollection>       cscSegments ;
-   iEvent.getByLabel( CSCSegmentTag,  cscSegments );
-   BeamHaloMatch( cscSegments, selectedPhotons, iSetup ) ;
-   
-   Handle<DTRecSegment4DCollection>   dtSegments ;
-   iEvent.getByLabel( DTSegmentTag,   dtSegments );
-   CosmicRayMatch( dtSegments, selectedPhotons, iSetup ) ;
+   if ( useRECO ) { 
+      Handle<CSCSegmentCollection>       cscSegments ;
+      iEvent.getByLabel( CSCSegmentTag,  cscSegments );
+      BeamHaloMatch( cscSegments, selectedPhotons, iSetup ) ;
+
+      Handle<DTRecSegment4DCollection>   dtSegments ;
+      iEvent.getByLabel( DTSegmentTag,   dtSegments );
+      CosmicRayMatch( dtSegments, selectedPhotons, iSetup ) ;
+   }
    //CosmicRayMatch( muons, selectedPhotons ) ;
    
-   //Handle< edm::OwnVector<TrackingRecHit> >  mu_rhits ;
-   //iEvent.getByLabel( staMuons,  mu_rhits );
-   //bool haloMuon = BeamHaloMatch( *(mu_rhits.product()), selectedPhotons, iSetup ) ;
-
    //IsoPhotonSelection( selectedPhotons ) ;
    //if ( selectedPhotons.size() < photonCuts[5] )  passEvent = false ;
 
    selectedJets.clear() ;
    //JetSelection( jets, selectedPhotons, selectedJets );
-   JetSelection( patjets, selectedPhotons, selectedJets );
+   JetSelection( patjets, selectedPhotons, scEB, scEE, recHitsEB, recHitsEE, selectedJets );
    //bool isGammaJets = GammaJetVeto( selectedPhotons, selectedJets ) ;
    //if ( isGammaJets ) passEvent = false ;
    if ( selectedJets.size() < jetCuts[3] )   passEvent = false ;
@@ -370,6 +371,7 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent, const edm::EventSetup&
 
    return passEvent ;
 }
+
 
 bool DPAnalysis::L1TriggerSelection( const edm::Event& iEvent, const edm::EventSetup& iSetup ) {
 
@@ -673,20 +675,12 @@ bool DPAnalysis::VertexSelection( Handle<reco::VertexCollection> vtx ) {
 
         if ( ! v->isValid() ||  v->isFake() ) continue ;
 
-        //printf("@@  N of trk: %d , ndof: %.1f", (int)v->tracksSize(), v->ndof() ) ;
         int ntrk = 0;
-        //double ht = 0 ;
         for (reco::Vertex::trackRef_iterator itrk = v->tracks_begin(); itrk != v->tracks_end(); ++itrk) {
             double d0 = (*itrk)->d0() ;
-            //double z0 = (*itrk)->dz() ;
-            //double sz = (*itrk)->dsz() ;
-            //printf("*   d0: %f , z0: %f , sz: %f \n", d0, z0 , sz ) ;
             if ( d0 >= vtxCuts[2] ) continue ;
-            //ht += (*itrk)->pt() ;
             ntrk++ ;
         }
-        //printf(" N of trk: %d , ht: %f, vtx_z: %f \n", ntrk, ht, v->z() ) ;
-
         //if ( fabs(v->z()) >= vtxCuts[0] ) continue ; 
         if (   v->ndof()   < vtxCuts[1] ) continue ;
 
@@ -757,7 +751,7 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
        float seedTime    = (float)seedRH->time();
        float seedTimeErr = (float)seedRH->timeError();
        float swissX = EcalTools::swissCross( seedCrystalId, *rechits , 0., true ) ;
-
+       float seedE       = seedRH->energy() ;
        // sMin and sMaj cuts
        if ( sMaj  > photonCuts[2] ) continue ;
        gcounter[4]++ ;
@@ -809,8 +803,6 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
        phoTmp.nchi2  = 0 ;
        phoTmp.nxtals = 0 ;
        phoTmp.nBC    = 0 ;
-       phoTmp.fSpike = -1 ;
-       phoTmp.maxSX  = -1 ;
        //cout<<" 1st xT : "<< aveXtalTime <<"  xTE : "<< aveXtalTimeErr << endl;
        // Only use the seed cluster
        //if ( seedTime > 5. ) debugT = true ;
@@ -822,8 +814,6 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
        leaves.timeChi2[k]     = phoTmp.nchi2 ;
        leaves.nXtals[k]       = phoTmp.nxtals ;
        leaves.nBC[k]          = phoTmp.nBC ;
-       leaves.fSpike[k]       = phoTmp.fSpike ;
-       leaves.maxSwissX[k]    = phoTmp.maxSX ; 
        leaves.seedSwissX[k]   = swissX ;
  
        debugT = false ;
@@ -841,16 +831,13 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
        leaves.phoEcalIso[k] = ecalSumEt ;
        leaves.phoHcalIso[k] = hcalSumEt ;
        leaves.phoTrkIso[k]  = trkSumPt ;
-       // the PFIso values need to be filled by PhotonPFIso function
-       //leaves.cHadIso[k]    = cHadIso ;
-       //leaves.nHadIso[k]    = nHadIso ;
-       //leaves.photIso[k]    = photIso ;
 
        leaves.dR_TrkPho[k]  = minDR ;
        leaves.pt_TrkPho[k]  = trkPt ;
        leaves.sMinPho[k]    = sMin ;
        leaves.sMajPho[k]    = sMaj ;
 
+       leaves.seedE[k]        = seedE ;
        leaves.seedTime[k]     = seedTime ;
        leaves.seedTimeErr[k]  = seedTimeErr ;
        leaves.aveTime[k]      = phoTmp.t ;       // weighted ave. time of seed cluster 
@@ -868,158 +855,6 @@ bool DPAnalysis::PhotonSelection( Handle<reco::PhotonCollection> photons, Handle
    if ( selectedPhotons.size() > 0 && maxPt >= photonCuts[7] )  return true ; 
    else                               return false ;    
 
-}
-
-// AOD version - using TrackingRecHits 
-bool DPAnalysis::BeamHaloMatch( OwnVector<TrackingRecHit> rhits, vector<const reco::Photon*>& selectedPhotons, const EventSetup& iSetup ) {
-
-    ESHandle<CSCGeometry> cscGeom;
-    iSetup.get<MuonGeometryRecord>().get(cscGeom);
-
-    bool halomatch = false ;
-    for ( size_t i=0; i< selectedPhotons.size() ; i++ ) {
-
-        float dPhi = 99. ;
-        float cscRho = -1. ;
-        for (OwnVector<TrackingRecHit>::const_iterator rh = rhits.begin(); rh != rhits.end() ; rh++ ) { 
-            //if( ! rh->isValid() ) continue ;
-	    if ( rh->geographicalId().subdetId() != MuonSubdetId::CSC ) continue ;
-	    if ( rh->geographicalId().det() != 2 ) continue ;
-	    //CSCDetId cscId( rh->rawId() );
-	    CSCDetId cscId( rh->geographicalId().rawId() );
-	    const CSCChamber* cscchamber = cscGeom->chamber( cscId );
-	    GlobalPoint  gp = cscchamber->toGlobal( rh->localPosition()  );
-	    double gpMag = sqrt( (gp.x()*gp.x()) + (gp.y()*gp.y()) + (gp.z()*gp.z()) ) ;
-	    LorentzVector segP4( gp.x(), gp.y(), gp.z(), gpMag ) ;
-
-            if ( fabs( gp.eta() ) < 1.6  ) continue ;
-            float dPhi_ = ROOT::Math::VectorUtil::DeltaPhi( segP4, selectedPhotons[i]->p4() ) ;
-	    float rho = sqrt( (gp.x()*gp.x()) + (gp.y()*gp.y()) ) ;
-            //printf(" (%d) phi_g: %.3f, phi_m: %.3f , dphi: %.3f , rho: %.1f \n ", 
-            //         i,  selectedPhotons[i]->p4().Phi() , segP4.Phi(), dPhi_ , rho ) ;
-            if ( fabs(dPhi_) < dPhi ) {
-               dPhi = fabs( dPhi_ ) ;
-               cscRho = rho ;
-            }
-	    //cout<<" ("<< k<<")   gpMag : "<< gpMag <<" eta: "<< gp.eta() << endl ;
-        }
-        //printf(" (%d) dphi: %.3f , rho: %.1f \n ", 
-        //         (int)i,   dPhi , cscRho ) ;
-	leaves.cscRho[i]  = cscRho ;
-	leaves.cscdPhi[i]  = dPhi ;
-        if ( dPhi < 0.1 )  halomatch = true ;
-    }
-    return halomatch ;
-
-}
-
-// Use cosmic muon 
-/*
-bool DPAnalysis::CosmicRayMatch( Handle<reco::MuonCollection> muons, vector<const reco::Photon*>& selectedPhotons ) 
-{
-
-   for ( size_t i=0; i< selectedPhotons.size() ; i++ ) 
-   {
-
-       double dPhi = 99. ;
-       double dEta = 99. ;
-       double dR   = 99. ;
-       int nMu = 0 ;
-       LorentzVector gP4 = selectedPhotons[i]->p4() ;
-       printf("** Photon pos:[ %f, %f, %f, %f ] \n", gP4.x(), gP4.y(), gP4.z(), gP4.rho() ) ;
-       for (reco::MuonCollection::const_iterator it = muons->begin(); it != muons->end(); it++) 
-       {
-           TrackRef inTrkRef = it->innerTrack() ;
-	   const std::vector<reco::Track>* inTrk = inTrkRef.product();
-           if ( inTrk != NULL ) 
-           {
-              const math::XYZPoint iPos = (*inTrk)[0].outerPosition() ; 
-              printf(" inner pos:( %f, %f, %f, %f ) \n", iPos.x() , iPos.y() , iPos.z(), iPos.rho()  ) ;
-           }
-
-           TrackRef outTrkRef = it->outerTrack() ;
-	   const std::vector<reco::Track>* outTrk = outTrkRef.product();
-           if ( outTrk != NULL ) 
-           {
-              const math::XYZPoint oPos = (*outTrk)[0].innerPosition() ; 
-              printf(" outer pos:( %f, %f, %f, %f ) \n", oPos.x() , oPos.y() , oPos.z(), oPos.rho()  ) ;
-           }
-       }
-
-   }
-
-   return true ;
-}
-*/
-
-// Use CosmicMuon track
-bool DPAnalysis::CosmicRayMatch( Handle<reco::MuonCollection> muons, vector<const reco::Photon*>& selectedPhotons ) 
-{
-
-   //cout<<" --------------- "<<endl ;
-   for ( size_t i=0; i< selectedPhotons.size() ; i++ ) 
-   {
-
-       double dPhi = 99. ;
-       double dEta = 99. ;
-       double dR   = 99. ;
-       int nMu = 0 ;
-       for (reco::MuonCollection::const_iterator it = muons->begin(); it != muons->end(); it++) 
-       {
-           nMu++ ;
-           
-	   //cout<<" =========== Cosmic Muon ===== "<< nMu  ;
-           //if (  it->isCaloCompatibilityValid() ) cout<<" , CaloCaloCompatibility is valid -> " << it->caloCompatibility() << endl ;
-           // Associated Track is only availabe for RECO ( information from TrackExtra ) , AOD can't use it !
-           /*
-           const reco::Track* track = 0;
-	   if ( ! it->track().isNull() ) {
-	        track = it->track().get();
-	   }
-	   else {
-		if ( ! it->standAloneMuon().isNull() ) {
-		   track = it->standAloneMuon().get();
-	        }
-                cout<<" no cosmic track is associated !! "<<endl ; 
-	   }
-           const math::XYZPoint oPos = track->outerPosition() ; 
-           const math::XYZPoint iPos = track->innerPosition() ; 
-	   printf(" outer pos:( %f, %f, %f, %f ) \n", oPos.eta() , oPos.phi() , oPos.z(), oPos.rho()  ) ;
-	   printf(" inner pos:( %f, %f, %f, %f ) \n", iPos.eta() , iPos.phi() , iPos.z(), iPos.rho()  ) ;
-           */
-           /*
-            for ( trackingRecHit_iterator coshit = track->recHitsBegin(); coshit != track->recHitsEnd(); coshit++ ) {
-                DetId id((*coshit)->geographicalId());
-                double hity = trackingGeometry->idToDet(id)->position().y();
-                cout<<" hity : "<< hity <<endl ;
-            }
-           */
-           if ( it->caloCompatibility() < 0.501 ) continue ;
-
-           math::XYZPointF ecalPos = (it->calEnergy()).ecal_position ;
-	   LorentzVector ecalP4( ecalPos.x(), ecalPos.y(), ecalPos.z(), sqrt(ecalPos.Mag2()) ) ;
-           if ( ecalPos.rho() < 0.01 ) continue ;
-
-           //printf(" Ecal pos:( %f, %f, %f, %f ) \n", ecalPos.eta() , ecalPos.phi() , ecalPos.z(), ecalPos.rho()  ) ;
-	   //printf(" muon calo :( %f, %f, %f, %f ) \n", ecalP4.eta() , ecalP4.phi() , ecalP4.z(), ecalP4.rho()  ) ;
-	   //printf(" Muon RECO :( %f, %f ) \n", it->eta() ,    it->phi()  ) ;
-           double dEta_ = fabs( ecalP4.eta() - selectedPhotons[i]->eta() ) ;
-           double dPhi_ = ROOT::Math::VectorUtil::DeltaPhi( ecalP4, selectedPhotons[i]->p4() ) ;
-           double dR_ = sqrt( (dEta_*dEta_) + (dPhi_*dPhi_) ) ;
-           //printf("mu(%d)  dR: %.3f \n", nMu, dR_ );
-           if ( dR_ < dR ) {
-               dR = dR_ ;
-               dPhi = fabs( dPhi_ ) ;
-               dEta = dEta_ ;
-           }
-           
-       }
-       leaves.dtdEta[i]  = dEta ;
-       leaves.dtdPhi[i]  = dPhi ;
-
-   }
-
-   return true ;
 }
 
 // !!! Only work for RECO - dtSegment is not available for AOD 
@@ -1109,22 +944,26 @@ bool DPAnalysis::BeamHaloMatch( Handle<CSCSegmentCollection> cscSeg, vector<cons
 	   double rho = sqrt( (gp.x()*gp.x()) + (gp.y()*gp.y()) ) ;
            if ( fabs(dPhi_) < dPhi ) {
               dPhi = fabs( dPhi_ ) ;
-              cscRho = rho ;
-              cscTime   = it->time() ;
+              cscRho  = rho ;
+              cscTime = it->time() ;
            }
        }
        if ( dPhi < 0.1 )  halomatch = true ;
-       leaves.cscRho[i]    = cscRho ;
-       leaves.cscdPhi[i]   = dPhi ;
+       leaves.cscRho[i]   = cscRho ;
+       leaves.cscdPhi[i]  = dPhi ;
        leaves.cscTime[i]  = cscTime ;
-
    }
+
    return halomatch ;
 }
 
 
 // return time, timeError
-pair<double,double> DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitCollection> recHitsEB, Handle<EcalRecHitCollection> recHitsEE ) {
+pair<double,double> DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitCollection> recHitsEB, Handle<EcalRecHitCollection> recHitsEE, float ECut, bool useAllClusters ) {
+
+  const EcalIntercalibConstantMap& icalMap = ical->getMap();
+  float adcToGeV_EB = float(agc->getEBValue());
+  float adcToGeV_EE = float(agc->getEEValue());
 
   double xtime = 0 ;
   double xtimeErr = 0 ;
@@ -1133,7 +972,7 @@ pair<double,double> DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle
   for ( reco::CaloCluster_iterator  clus = scRef->clustersBegin() ;  clus != scRef->clustersEnd();  ++clus) {
 
       // only use seed basic cluster  
-      if ( *clus != scRef->seed() ) continue ;
+      if ( *clus != scRef->seed() && !useAllClusters ) continue ;
       // GFdoc clusterDetIds holds crystals that participate to this basic cluster 
       // 2. loop on xtals in cluster
       std::vector<std::pair<DetId, float> > clusterDetIds = (*clus)->hitsAndFractions() ; //get these from the cluster
@@ -1158,26 +997,38 @@ pair<double,double> DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle
 	     // GFdoc this is one crystal in the basic cluster
 	     EcalRecHit myhit = (*thishit) ;
 	   
+             double thisamp  = myhit.energy () ;
+             EcalIntercalibConstantMap::const_iterator icalit = icalMap.find(detitr->first);
+             EcalIntercalibConstant icalconst = 1;
+             if( icalit!=icalMap.end() ) {
+               icalconst = (*icalit);
+             } 
+             // get laser coefficient
+             float lasercalib = laser->getLaserCorrection( detitr->first, eventTime );
+             float adcToGeV = ( isEB ) ? adcToGeV_EB : adcToGeV_EE ;
+             // discard rechits with A/sigma < 12
+             if ( thisamp/(icalconst*lasercalib*adcToGeV) < (1.1*12) ) continue;
              // SIC Feb 14 2011 -- Add check on RecHit flags (takes care of spike cleaning in 42X)
              //if ( !( myhit.checkFlag(EcalRecHit::kGood) || myhit.checkFlag(EcalRecHit::kOutOfTime) || 
              //       myhit.checkFlag(EcalRecHit::kPoorCalib)  ) )  continue;
              if ( !( myhit.checkFlag(EcalRecHit::kGood) || myhit.checkFlag(EcalRecHit::kOutOfTime) ) )  continue;
-
+             //GlobalPoint pos = theGeometry->getPosition( (myhit).detid() );
+             if ( myhit.energy() < ECut ) continue ; 
              nXtl++ ;
 
              // time and time correction
 	     double thistime = myhit.time();
 
              // get time error 
-             double xtimeErr_ = ( myhit.isTimeErrorValid() ) ?  myhit.timeError() : 999999 ;
+             double xtimeErr_ = ( myhit.isTimeErrorValid() ) ?  myhit.timeError() : 999 ;
  
              xtime     += thistime / pow( xtimeErr_ , 2 ) ;
              xtimeErr  += 1/ pow( xtimeErr_ , 2 ) ;
       }
       //cout<<" total Xtl = " << nXtl << endl ;
   }
-  double wAveTime = xtime / xtimeErr ;
-  double wAveTimeErr = 1. / sqrt( xtimeErr) ;
+  double wAveTime = ( xtimeErr < 0.000001 ) ? 0. : xtime / xtimeErr ;
+  double wAveTimeErr =  ( xtimeErr < 0.000001 ) ? 0. : 1. / sqrt( xtimeErr) ;
   pair<double, double> wAveTE( wAveTime, wAveTimeErr ) ;
   return wAveTE ;  
 
@@ -1186,7 +1037,7 @@ pair<double,double> DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle
 // re-calculate time and timeError as well as normalized chi2
 //void DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitCollection> recHitsEB, Handle<EcalRecHitCollection> recHitsEE, double& aveTime, double& aveTimeErr, double& nChi2, bool useAllClusters ) {
 
-void DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitCollection> recHitsEB, Handle<EcalRecHitCollection> recHitsEE, PhoInfo& phoTmp, bool useAllClusters ) {
+void DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitCollection> recHitsEB, Handle<EcalRecHitCollection> recHitsEE, PhoInfo& phoTmp, float ECut, bool useAllClusters ) {
 
   const EcalIntercalibConstantMap& icalMap = ical->getMap();
   float adcToGeV_EB = float(agc->getEBValue());
@@ -1196,16 +1047,13 @@ void DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitColl
   double xtimeErr = 0 ;
   double chi2_bc  = 0 ;
   double ndof     = 0 ;
-  double maxSwissX = 0 ;
   int    nBC      = 0 ;
   int    nXtl     = 0 ;
-  int    nSpike   = 0 ; 
-  int    nSeedXtl = 0 ;
   for ( reco::CaloCluster_iterator  clus = scRef->clustersBegin() ;  clus != scRef->clustersEnd();  ++clus) {
 
       nBC++ ;
       // only use seed basic cluster  
-      bool isSeed = ( *clus == scRef->seed() ) ;
+      //bool isSeed = ( *clus == scRef->seed() ) ;
       if ( *clus != scRef->seed() && !useAllClusters ) continue ;
 
       // GFdoc clusterDetIds holds crystals that participate to this basic cluster 
@@ -1234,14 +1082,10 @@ void DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitColl
                     myhit.checkFlag(EcalRecHit::kPoorCalib)  ) )  continue;
 
              //if ( myhit.checkFlag(EcalRecHit::kWeird) || myhit.checkFlag(EcalRecHit::kDiWeird) ) continue ;
-             bool gotSpike = ( myhit.checkFlag(EcalRecHit::kWeird) || myhit.checkFlag(EcalRecHit::kDiWeird) )  ;
-
+             //bool gotSpike = ( myhit.checkFlag(EcalRecHit::kWeird) || myhit.checkFlag(EcalRecHit::kDiWeird) )  ;
              // swiss cross cleaning 
-             float swissX = (isEB) ? EcalTools::swissCross(detitr->first, *recHitsEB , 0., true ) : 
-                                     EcalTools::swissCross(detitr->first, *recHitsEE , 0., true ) ;
-             maxSwissX = ( isSeed && swissX  > maxSwissX ) ? swissX : maxSwissX ;
-             if ( gotSpike && isSeed ) nSpike++  ;
-             if ( isSeed             ) nSeedXtl++  ;
+             //float swissX = (isEB) ? EcalTools::swissCross(detitr->first, *recHitsEB , 0., true ) : 
+             //                        EcalTools::swissCross(detitr->first, *recHitsEE , 0., true ) ;
 
              // thisamp is the EB amplitude of the current rechit
              double thisamp  = myhit.energy () ;
@@ -1255,10 +1099,10 @@ void DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitColl
 
              // get laser coefficient
              float lasercalib = laser->getLaserCorrection( detitr->first, eventTime );
-
              float adcToGeV = ( isEB ) ? adcToGeV_EB : adcToGeV_EE ;
              // discard rechits with A/sigma < 12
              if ( thisamp/(icalconst*lasercalib*adcToGeV) < (1.1*12) ) continue;
+             if ( myhit.energy() < ECut ) continue ; 
              //GlobalPoint pos = theGeometry->getPosition((myhit).detid());
 
              // time and time correction
@@ -1266,7 +1110,7 @@ void DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitColl
 	     //thistime += theTimeCorrector_.getCorrection((float) thisamp/(icalconst*lasercalib*adcToGeV), pos.eta()  );
 
              // get time error 
-             double xtimeErr_ = ( myhit.isTimeErrorValid() ) ?  myhit.timeError() : 999999 ;
+             double xtimeErr_ = ( myhit.isTimeErrorValid() ) ?  myhit.timeError() : 999 ;
 
              // calculate chi2 for the BC of the seed
              double chi2_x = pow( ((thistime - phoTmp.t) / xtimeErr_ ) , 2 ) ; 
@@ -1282,15 +1126,13 @@ void DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitColl
       }
   }
   if ( debugT ) printf("--- sum_chi2: %.2f, ndof: %.1f norm_chi2: %.2f ---\n", chi2_bc, ndof, chi2_bc/ndof );
-  //cout<<" nSpike = "<<  nSpike <<" nXtl = "<< nSeedXtl <<"  maxSwissX = "<< maxSwissX  << endl ;
   // update ave. time and error
-  phoTmp.t     = xtime / xtimeErr ;
-  phoTmp.dt    = 1. / sqrt( xtimeErr) ;
+
+  phoTmp.t     = ( xtimeErr < 0.000001 ) ? 0. : xtime / xtimeErr ;
+  phoTmp.dt    = ( xtimeErr < 0.000001 ) ? 0. : 1. / sqrt( xtimeErr) ;
   phoTmp.nchi2 = ( ndof != 0 ) ? chi2_bc / ndof : 9999999 ;     
-  phoTmp.fSpike = ( nSeedXtl > 0 ) ? (nSpike*1.) / (nSeedXtl*1.) : -1 ;
   phoTmp.nxtals = nXtl ;
   phoTmp.nBC    = nBC ;
-  phoTmp.maxSX  = maxSwissX ;
 
 }
 
@@ -1419,6 +1261,139 @@ bool DPAnalysis::JetSelection( Handle< vector<pat::Jet> > patjets, vector<const 
        leaves.jetCEF[k]  = it->chargedEmEnergyFraction() ;
        leaves.jetNHF[k]  = it->neutralHadronEnergyFraction() ;  
        leaves.jetNEF[k]  = it->neutralEmEnergyFraction() ;
+       //leaves.jecUncU[k]  = uncV[0] ;
+       //leaves.jecUncD[k]  = uncV[1] ;
+       leaves.jecUnc[k]  = uncV[2] ;
+       leaves.jerUnc[k]  = dPt ;
+       k++ ;
+   }
+   leaves.nJets = (int)( selectedJets.size() ) ;
+   leaves.met_dx1    = met_dx  ;
+   leaves.met_dy1    = met_dy  ;
+   leaves.met_dx2    = met_sx  ;
+   leaves.met_dy2    = met_sy  ;
+
+   if ( selectedJets.size() > 0 )  return true ; 
+   else                            return false ;    
+
+}
+
+bool DPAnalysis::JetSelection( Handle< vector<pat::Jet> > patjets, vector<const reco::Photon*>& selectedPhotons, 
+                               Handle<reco::SuperClusterCollection> scEB, Handle<reco::SuperClusterCollection> scEE, 
+                               Handle<EcalRecHitCollection> recHitsEB, Handle<EcalRecHitCollection> recHitsEE,
+                               vector< pat_Jet* >& selectedJets_ ) {
+
+   int k = 0 ;
+   double met_dx(0), met_dy(0) ;
+   double met_sx(0), met_sy(0) ;
+   double SF = 1. ;
+   for ( std::vector<pat::Jet>::const_iterator it = patjets->begin(); it != patjets->end(); it++ ) {
+ 
+       bool passPtCut = it->pt() > jetCuts[0] ;
+       // calculate JER uncertainty 
+       double ptscale = 1 ;
+       double dPt = 0 ;
+       if ( !isData ) {
+          const reco::GenJet* matchedGenJet = it->genJet() ;
+	  if ( it->pt() < 10. ) continue ;
+	  if ( matchedGenJet == NULL ) continue ;
+
+	  met_dx += it->px() ;
+	  met_dy += it->py() ;
+
+	  // This is data/MC ratio
+	  if ( fabs(it->eta()) < 0.5 ) SF = 1.052 ;
+	  if ( fabs(it->eta()) >= 0.5 && fabs(it->eta()) < 1.1 ) SF = 1.057 ;
+	  if ( fabs(it->eta()) >= 1.1 && fabs(it->eta()) < 1.7 ) SF = 1.096 ;
+	  if ( fabs(it->eta()) >= 1.7 && fabs(it->eta()) < 2.3 ) SF = 1.134 ;
+	  if ( fabs(it->eta()) >= 2.3 && fabs(it->eta()) < 2.5 ) SF = 1.288 ;
+	  dPt = ( it->pt() - matchedGenJet->pt() )*(1-SF) ;
+	  ptscale = max( 0.0, ( it->pt() + dPt)/it->pt() ) ;
+
+	  met_dx -= ( it->px() * ptscale ) ;
+	  met_dy -= ( it->py() * ptscale ) ;
+       }
+       if ( (it->pt() + dPt) > jetCuts[0] || (it->pt() - dPt) > jetCuts[0] ) passPtCut = true ;
+
+       // Calculate JES uncertainty
+       vector<double> uncV = JECUncertainty( it->pt(), it->eta(), jecUnc ) ;
+       if ( (it->pt() + (uncV[2]*it->pt()) ) > jetCuts[0] || (it->pt() - (uncV[2]*it->pt()) ) > jetCuts[0] ) passPtCut = true ;
+       met_sx += it->px() ;
+       met_sy += it->py() ;
+       double jes_sc = ( it->pt() + uncV[2] ) / it->pt() ;
+       met_sx -= it->px() * jes_sc ;
+       met_sy -= it->py() * jes_sc ;
+
+       // Pt and Fiducial cuts - include those within JES and JER range
+       if ( !passPtCut || fabs( it->eta() ) > jetCuts[1] ) continue ;
+
+       // Jet ID cuts
+       //if ( it->numberOfDaughters() < 2 )               continue ;
+       //if ( it->chargedEmEnergyFraction() >= 0.99 )     continue ;
+       //if ( it->neutralHadronEnergyFraction() >= 0.99 ) continue ;
+       //if ( it->neutralEmEnergyFraction() >= 0.99 )     continue ;
+       //if ( fabs( it->eta() ) < 2.4 && it->chargedHadronEnergyFraction() <=0 ) continue ;
+       //if ( fabs( it->eta() ) < 2.4 && it->chargedMultiplicity() <=0 ) continue ;
+       
+       // dR cuts - exclude fake jet which looks like photon
+       double dR = 999 ;
+       for (size_t j=0; j < selectedPhotons.size(); j++ ) {
+           double dR_ =  ROOT::Math::VectorUtil::DeltaR( it->p4(), selectedPhotons[j]->p4() ) ;
+           if ( dR_ < dR ) dR = dR_ ;
+       }
+       if ( dR <= jetCuts[2] ) continue ;
+
+       int iSC = 0;
+       float maxEnergy = 0 ;
+       pair<double,double> jetTime ;
+       for (reco::SuperClusterCollection::const_iterator scIt = scEB->begin() ; scIt != scEB->end(); scIt++) { 
+
+           if ( fabs( it->p4().Eta() ) > 1.54 ) break ;
+           double dEta = it->p4().Eta() - scIt->position().eta() ;
+           double dPhi = it->p4().Phi() - scIt->position().phi() ;
+           double dR = sqrt( dEta*dEta + dPhi*dPhi ) ;
+
+           if ( dR < 0.3  && scIt->energy() > maxEnergy ) {
+              jetTime = ClusterTime( reco::SuperClusterRef(scEB, iSC), recHitsEB, recHitsEE, 10, true ) ;
+              maxEnergy = scIt->energy() ;
+           } else {
+              continue ;
+           }
+           iSC++ ;
+       }
+
+       iSC = 0 ;
+       for (reco::SuperClusterCollection::const_iterator scIt = scEE->begin() ; scIt != scEE->end(); scIt++) { 
+
+           if ( fabs( it->p4().Eta() ) < 1.4 ) break ;
+           double dEta = it->p4().Eta() - scIt->position().eta() ;
+           double dPhi = it->p4().Phi() - scIt->position().phi() ;
+           double dR = sqrt( dEta*dEta + dPhi*dPhi ) ;
+
+           pair<double,double> jetTime ;
+           if ( dR < 0.3  && scIt->energy() > maxEnergy ) {
+              jetTime = ClusterTime( reco::SuperClusterRef(scEE, iSC), recHitsEB, recHitsEE, 10, true ) ;
+              maxEnergy = scIt->energy() ;
+           } else {
+              continue ;
+           }
+           iSC++ ;
+       }
+
+       if ( k >= MAXJET ) continue ;
+       selectedJets_.push_back( &(*it) ) ;
+       leaves.jetPx[k] = it->p4().Px() ;
+       leaves.jetPy[k] = it->p4().Py() ;
+       leaves.jetPz[k] = it->p4().Pz() ;
+       leaves.jetE[k]  = it->p4().E()  ;
+       leaves.jetNDau[k] = it->numberOfDaughters() ;
+       leaves.jetCM[k]   = it->chargedMultiplicity() ;
+       leaves.jetCEF[k]  = it->chargedEmEnergyFraction() ;
+       leaves.jetNHF[k]  = it->neutralHadronEnergyFraction() ;  
+       leaves.jetNEF[k]  = it->neutralEmEnergyFraction() ;
+       leaves.jetTime[k]    = jetTime.first ;
+       leaves.jetTimeErr[k] = jetTime.second ;
+       leaves.jetSCE[k]     = maxEnergy ;
        //leaves.jecUncU[k]  = uncV[0] ;
        //leaves.jecUncD[k]  = uncV[1] ;
        leaves.jecUnc[k]  = uncV[2] ;

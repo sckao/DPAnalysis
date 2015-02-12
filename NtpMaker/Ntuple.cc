@@ -89,6 +89,10 @@ void setBranchAddresses(TTree* chain, Ntuple& treeVars)
   chain -> SetBranchAddress("jetTime",      treeVars.jetTime    );
   chain -> SetBranchAddress("jetTimeErr",   treeVars.jetTimeErr );
   chain -> SetBranchAddress("jetSCE",       treeVars.jetSCE     );
+  chain -> SetBranchAddress("genJetPx",     treeVars.genJetPx   );
+  chain -> SetBranchAddress("genJetPy",     treeVars.genJetPy   );
+  chain -> SetBranchAddress("genJetPz",     treeVars.genJetPz   );
+  chain -> SetBranchAddress("genJetE",      treeVars.genJetE    );
   //chain -> SetBranchAddress("jecUncU",      treeVars.jecUncU  );
   //chain -> SetBranchAddress("jecUncD",      treeVars.jecUncD  );
   
@@ -223,8 +227,12 @@ void setBranches(TTree* chain, Ntuple& treeVars)
   chain -> Branch("jetTime",      treeVars.jetTime,               "jetTime[nJets]/F" );
   chain -> Branch("jetTimeErr",   treeVars.jetTimeErr,            "jetTimeErr[nJets]/F" );
   chain -> Branch("jetSCE",       treeVars.jetSCE,                "jetSCE[nJets]/F" );
-  //chain -> Branch("jecUncU",      treeVars.jecUncU,               "jecUncU[nJets]/F" );
-  //chain -> Branch("jecUncD",      treeVars.jecUncD,               "jecUncD[nJets]/F" );
+  chain -> Branch("genJetPx",     treeVars.genJetPx,              "genJetPx[nJets]/F");
+  chain -> Branch("genJetPy",     treeVars.genJetPy,              "genJetPy[nJets]/F");
+  chain -> Branch("genJetPz",     treeVars.genJetPz,              "genJetPz[nJets]/F");
+  chain -> Branch("genJetE",      treeVars.genJetE,               "genJetE[nJets]/F");
+  //chain -> Branch("jecUncU",      treeVars.jecUncU,            "jecUncU[nJets]/F" );
+  //chain -> Branch("jecUncD",      treeVars.jecUncD,            "jecUncD[nJets]/F" );
   
   chain -> Branch("phoPx",        treeVars.phoPx,                 "phoPx[nPhotons]/F");
   chain -> Branch("phoPy",        treeVars.phoPy,                 "phoPy[nPhotons]/F");
@@ -346,6 +354,10 @@ void initializeBranches(TTree* chain, Ntuple& treeVars)
       treeVars.jetTime[i] = -50. ;
       treeVars.jetTimeErr[i] = 0 ;
       treeVars.jetSCE[i] = 0 ;
+      treeVars.genJetPx[i] = 0 ;
+      treeVars.genJetPy[i] = 0 ;
+      treeVars.genJetPz[i] = 0 ;
+      treeVars.genJetE[i] = 0 ;
       //treeVars.jecUncU[i] = 0 ;
       //treeVars.jecUncD[i] = 0 ;
   }

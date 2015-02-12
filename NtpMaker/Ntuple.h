@@ -60,8 +60,10 @@ struct Ntuple
   float jetTime[MAXJET] ;
   float jetTimeErr[MAXJET] ;
   float jetSCE[MAXJET] ;
-  //float jecUncU[MAXJET];
-  //float jecUncD[MAXJET];
+  float genJetPx[MAXJET];
+  float genJetPy[MAXJET];
+  float genJetPz[MAXJET];
+  float genJetE[MAXJET];
   
   float metPx;
   float metPy;

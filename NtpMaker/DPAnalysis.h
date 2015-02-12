@@ -233,8 +233,8 @@ class DPAnalysis : public edm::EDAnalyzer {
 
       //double HLTMET( edm::Handle<reco::PFJetCollection> jets, vector<const reco::Muon*>& selectedMuons, bool addMuon = false ) ;
 
-      bool JetSelection( edm::Handle<reco::PFJetCollection> jets, vector<const reco::Photon*>& selectedPhotons,
-                                                                  vector<const reco::PFJet*>& selectedJets ) ;
+      bool JetSelection( edm::Handle<reco::PFJetCollection> jets,
+                         vector<const reco::Photon*>& selectedPhotons, vector<const reco::PFJet*>& selectedJets ) ;
 
       bool JetSelection( edm::Handle<std::vector<pat::Jet> > patjets, vector<const reco::Photon*>& selectedPhotons, 
                             vector< pat_Jet* >& selectedJets_ ) ;

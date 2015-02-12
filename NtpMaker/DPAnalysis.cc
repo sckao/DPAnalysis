@@ -238,7 +238,7 @@ void DPAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
    if ( pass && passTrigger ) counter[11]++ ;   
 
    // fill the ntuple
-   if ( pass && !isData ) theTree->Fill();
+   if ( !isData && pass ) theTree->Fill();
    if ( pass && isData && passTrigger ) theTree->Fill();
    delete jecUnc ;  
 }
@@ -252,6 +252,7 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent, const edm::EventSetup&
    //Handle<reco::GsfElectronCollection> electrons; 
    Handle<reco::MuonCollection>        muons; 
    Handle<reco::PFJetCollection>       jets; 
+   //Handle<reco::GenJetCollection>      genjets; 
    Handle<std::vector<pat::Jet> >      patjets;
    Handle<reco::PFMETCollection>       met0; 
    Handle<reco::PFMETCollection>       met; 
@@ -269,6 +270,7 @@ bool DPAnalysis::EventSelection(const edm::Event& iEvent, const edm::EventSetup&
    iEvent.getByLabel( muonSource,     muons );
    iEvent.getByLabel( jetSource,      jets  );
    iEvent.getByLabel( patJetSource,   patjets);
+   //iEvent.getByLabel( "ak5GenJets",   genjets  );
    iEvent.getByLabel( metSource,      met0  );
    iEvent.getByLabel( type1metSource, met  );
    iEvent.getByLabel( EBRecHitCollection,     recHitsEB );
@@ -1136,8 +1138,8 @@ void DPAnalysis::ClusterTime( reco::SuperClusterRef scRef, Handle<EcalRecHitColl
 
 }
 
-bool DPAnalysis::JetSelection( Handle<reco::PFJetCollection> jets, vector<const reco::Photon*>& selectedPhotons, 
-                               vector<const reco::PFJet*>& selectedJets) {
+bool DPAnalysis::JetSelection( Handle<reco::PFJetCollection> jets, 
+                      vector<const reco::Photon*>& selectedPhotons, vector<const reco::PFJet*>& selectedJets) {
 
    int k = 0 ;
    for(reco::PFJetCollection::const_iterator it = jets->begin(); it != jets->end(); it++) {
@@ -1164,6 +1166,7 @@ bool DPAnalysis::JetSelection( Handle<reco::PFJetCollection> jets, vector<const 
        vector<double> uncV = JECUncertainty( it->pt(), it->eta(), jecUnc ) ;
 
        if ( k >= MAXJET ) break ;
+
        selectedJets.push_back( &(*it) ) ;
        leaves.jetPx[k] = it->p4().Px() ;
        leaves.jetPy[k] = it->p4().Py() ;
@@ -1293,6 +1296,7 @@ bool DPAnalysis::JetSelection( Handle< vector<pat::Jet> > patjets, vector<const 
        // calculate JER uncertainty 
        double ptscale = 1 ;
        double dPt = 0 ;
+       double genJetP4[5] = { 0,0,0,0, -1 };
        if ( !isData ) {
           const reco::GenJet* matchedGenJet = it->genJet() ;
 	  if ( it->pt() < 10. ) continue ;
@@ -1312,6 +1316,12 @@ bool DPAnalysis::JetSelection( Handle< vector<pat::Jet> > patjets, vector<const 
 
 	  met_dx -= ( it->px() * ptscale ) ;
 	  met_dy -= ( it->py() * ptscale ) ;
+
+          // find the corresponding genJets
+	  genJetP4[0] = matchedGenJet->energy()  ;
+	  genJetP4[1] = matchedGenJet->px() ;
+	  genJetP4[2] = matchedGenJet->py() ;
+	  genJetP4[3] = matchedGenJet->pz();
        }
        if ( (it->pt() + dPt) > jetCuts[0] || (it->pt() - dPt) > jetCuts[0] ) passPtCut = true ;
 
@@ -1342,6 +1352,7 @@ bool DPAnalysis::JetSelection( Handle< vector<pat::Jet> > patjets, vector<const 
            if ( dR_ < dR ) dR = dR_ ;
        }
        if ( dR <= jetCuts[2] ) continue ;
+
 
        int iSC = 0;
        float maxEnergy = 0 ;
@@ -1398,6 +1409,10 @@ bool DPAnalysis::JetSelection( Handle< vector<pat::Jet> > patjets, vector<const 
        //leaves.jecUncD[k]  = uncV[1] ;
        leaves.jecUnc[k]  = uncV[2] ;
        leaves.jerUnc[k]  = dPt ;
+       leaves.genJetE[k]  = genJetP4[0] ;
+       leaves.genJetPx[k] = genJetP4[1] ;
+       leaves.genJetPy[k] = genJetP4[2] ;
+       leaves.genJetPz[k] = genJetP4[3] ;
        k++ ;
    }
    leaves.nJets = (int)( selectedJets.size() ) ;

@@ -212,7 +212,8 @@ bool Selection::ElectronFilter() {
          }
          if ( dR_ej < electronCuts[3] ) continue ;
 
-         eleV.push_back( make_pair( j, eP4.Pt()) ) ;
+         //eleV.push_back( make_pair( j, eP4.Pt()) ) ;
+         eleV.push_back( make_pair( j, eP4) ) ;
      }
      if ( eleV.size() < 1 ) pass = false ;
      return pass = false ;
@@ -236,7 +237,8 @@ bool Selection::MuonFilter() {
          }
          if ( dR_mj < muonCuts[3] ) continue ;
 
-         muV.push_back( make_pair( j, mP4.Pt() ) ) ;
+         //muV.push_back( make_pair( j, mP4.Pt() ) ) ;
+         muV.push_back( make_pair( j, mP4 ) ) ;
      }
      if ( muV.size() < 1 ) pass = false ;
      return pass = false ;
